@@ -1,5 +1,10 @@
 # Histórico de versões
 
+## [0.4.0] — 2026-11-11
+- Interface administrativa refeita com layout responsivo, hierarquia visual e estados de carregamento/vazio mais claros.
+- Calendário reorganizado como agenda operacional: primeiro vencimento real selecionado, contagem por dia e painel lateral com objeto, fornecedor, área, valor, status e link do PNCP.
+- Menu móvel, foco visível e componentes de filtros/tabelas ajustados para uso em desktop e celular.
+
 Cada pedido atendido gera registro em `docs/PEDIDOS.md`, alteração rastreável por commit e testes.
 
 ## [0.3.0] — 2026-11-11

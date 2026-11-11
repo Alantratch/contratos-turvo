@@ -57,7 +57,7 @@
     });
     const names = {overview:"Visão geral",contracts:"Contratos",procurements:"Contratações",calendar:"Calendário",secretaries:"Secretarias",sync:"Sincronização"};
     $("breadcrumb").textContent = names[next];
-    $("sidebar").classList.remove("open");
+    document.querySelector(".app-shell").classList.remove("menu-open");
     $("menu-toggle").setAttribute("aria-expanded", "false");
     if (next === "contracts") loadContracts();
     if (next === "procurements") loadProcurements();
@@ -75,10 +75,10 @@
       $("stat-unclassified").textContent = number(s.unclassified);
       $("overview-sync").textContent = s.sync ? "Última verificação: " + (s.sync.status === "ok" ? "concluída" : "com falha") + (s.sync.finished_at ? " · " + new Date(s.sync.finished_at).toLocaleString("pt-BR") : "") : "Aguardando primeira sincronização";
       const groups = s.by_secretary || [];
-      $("secretary-chart").className = groups.length ? "bars" : "chart-empty";
+      $("secretary-chart").className = groups.length ? "chart-bars" : "chart-empty";
       $("secretary-chart").innerHTML = groups.length ? groups.slice(0, 7).map((g) => {
         const width = Math.max(1, Math.round(100 * g.count / Math.max(1, groups[0].count)));
-        return '<div class="bar-item"><div class="bar-top"><strong>' + html(g.name) + '</strong><span>' + number(g.count) + '</span></div><div class="bar-track"><div class="bar-fill" style="width:' + width + '%"></div></div></div>';
+        return '<div class="chart-row"><strong>' + html(g.name) + '</strong><div class="chart-track"><div class="chart-fill" style="width:' + width + '%"></div></div><span>' + number(g.count) + '</span></div>';
       }).join("") : "Sem contratos classificados com vencimento nos próximos 60 dias.";
       const upcoming = await api("/api/contracts?period=30&limit=5");
       $("upcoming-body").innerHTML = upcoming.items.length ? upcoming.items.map((c) =>
@@ -212,7 +212,7 @@
       const count = new Date(year, monthIndex + 1, 0).getDate();
       const offset = (first.getDay() + 6) % 7;
       if (!calendarSelectedDay || !calendarSelectedDay.startsWith(month)) {
-        calendarSelectedDay = currentMonth ? today : ((data.days || [])[0]?.date || isoLocal(first));
+        calendarSelectedDay = (data.days || [])[0]?.date || (currentMonth ? today : isoLocal(first));
       }
       const cells = Array.from({length:offset}, () => '<span class="calendar-spacer" aria-hidden="true"></span>');
       for (let day = 1; day <= count; day++) {
@@ -245,13 +245,15 @@
     const items = calendarDays[day] || [];
     if (requestId !== calendarRequest || day !== calendarSelectedDay || view !== "calendar") return;
     $("calendar-selected-count").textContent = number(items.length) + " contrato(s) com vencimento registrado nesta data";
-    $("calendar-day-list").innerHTML = items.length ? items.map(c =>
-        '<article class="calendar-entry"><div class="entry-top"><strong>' + html(c.number || c.pncp_key) + '</strong>' + status(c.end_date) +
+    $("calendar-day-list").innerHTML = items.length ? items.map(c => {
+      const hasPncpLink = /^\d{14}$/.test(c.buyer_cnpj || "") && Number.isInteger(c.year) && Number.isInteger(c.sequence);
+      const pncpLink = hasPncpLink ? '<a class="entry-link" target="_blank" rel="noopener noreferrer" href="https://pncp.gov.br/app/contratos/' + c.buyer_cnpj + '/' + c.year + '/' + c.sequence + '">Abrir no PNCP ↗</a>' : "";
+      return '<article class="calendar-entry"><div class="entry-top"><strong>' + html(c.number || c.pncp_key) + '</strong>' + status(c.end_date) +
         '</div><p class="calendar-entry-object">' + html(c.object || "Objeto não informado") + '</p><small>' +
         html(c.supplier || "Fornecedor não informado") + '</small><small>' +
         html(c.secretary || "Sem secretaria definida") + '</small><small class="calendar-entry-object">' +
-        html(money(c.amount)) + '</small></article>'
-      ).join("") : '<p class="muted calendar-empty">Nenhum contrato com vencimento registrado nesse dia.</p>';
+        html(money(c.amount)) + '</small>' + pncpLink + '</article>';
+    }).join("") : '<p class="muted calendar-empty">Nenhum contrato com vencimento registrado nesse dia.</p>';
     $("calendar-see-all").hidden = items.length === 0;
   }
 
@@ -266,7 +268,7 @@
 
   document.querySelectorAll("[data-view]").forEach((button) => button.addEventListener("click", () => switchView(button.dataset.view)));
   $("menu-toggle").addEventListener("click", () => {
-    const opened = $("sidebar").classList.toggle("open");
+    const opened = document.querySelector(".app-shell").classList.toggle("menu-open");
     $("menu-toggle").setAttribute("aria-expanded", String(opened));
   });
   $("refresh").addEventListener("click", () => { loadSummary(); });

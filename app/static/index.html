@@ -3,181 +3,91 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#082d53">
+  <meta name="theme-color" content="#0b2945">
   <meta name="robots" content="noindex,nofollow">
-  <title>Gestão de Contratos · Turvo/PR</title>
+  <title>Contratos · Turvo/PR</title>
   <link rel="stylesheet" href="/assets/style.css">
-  <style>.brand-logo{display:block;width:190px;height:70px;object-fit:contain;object-position:left center}</style>
   <script defer src="/assets/app.js"></script>
 </head>
 <body>
-  <div class="shell">
+  <div class="app-shell">
     <aside class="sidebar" id="sidebar">
-      <div class="brand">
+      <div class="brand-block">
         <img class="brand-logo" src="/assets/logo-turvo.png" alt="Prefeitura Municipal de Turvo">
+        <span class="brand-caption">Gestão de contratos</span>
       </div>
-      <div class="side-label">ÁREA DE TRABALHO</div>
+      <div class="sidebar-label">NAVEGAÇÃO</div>
       <nav class="nav" aria-label="Navegação principal">
-        <button class="nav-item selected" data-view="overview" aria-current="page"><span class="nav-icon" aria-hidden="true">▦</span> Visão geral</button>
-        <button class="nav-item" data-view="contracts"><span class="nav-icon" aria-hidden="true">▤</span> Contratos</button>
-        <button class="nav-item" data-view="procurements"><span class="nav-icon" aria-hidden="true">◫</span> Contratações</button>
-        <button class="nav-item" data-view="calendar"><span class="nav-icon" aria-hidden="true">▦</span> Calendário</button>
-        <button class="nav-item" data-view="secretaries"><span class="nav-icon" aria-hidden="true">▥</span> Secretarias / áreas</button>
-        <button class="nav-item" data-view="sync"><span class="nav-icon" aria-hidden="true">↻</span> Sincronização</button>
+        <button class="nav-item selected" data-view="overview" aria-current="page"><span class="nav-icon">⌂</span><span>Visão geral</span></button>
+        <button class="nav-item" data-view="contracts"><span class="nav-icon">▤</span><span>Contratos</span></button>
+        <button class="nav-item" data-view="procurements"><span class="nav-icon">◫</span><span>Contratações</span></button>
+        <button class="nav-item" data-view="calendar"><span class="nav-icon">□</span><span>Calendário</span></button>
+        <button class="nav-item" data-view="secretaries"><span class="nav-icon">♧</span><span>Secretarias / áreas</span></button>
+        <button class="nav-item" data-view="sync"><span class="nav-icon">↻</span><span>Sincronização</span></button>
       </nav>
-      <div class="sidebar-bottom">
-        <div class="side-info"><span class="dot"></span> PNCP + Compras.gov.br</div>
-        <p>Dados públicos importados. Confira atos, aditivos e vigências antes de tomar decisões.</p>
+      <div class="sidebar-footer">
+        <div class="source-chip"><span class="live-dot"></span> PNCP + Compras.gov.br</div>
+        <p>Dados públicos importados para acompanhamento interno.</p>
         <small>Prefeitura Municipal de Turvo · Paraná</small>
       </div>
     </aside>
 
-    <main class="main">
+    <main class="main-content">
       <header class="topbar">
         <div class="topbar-left">
-          <button class="menu-toggle" id="menu-toggle" aria-label="Abrir menu" aria-expanded="false">☰</button>
-          <span class="breadcrumb">Administração <span class="chevron">/</span> <strong id="breadcrumb">Visão geral</strong></span>
+          <button class="icon-button menu-toggle" id="menu-toggle" aria-label="Abrir menu" aria-expanded="false">☰</button>
+          <div class="breadcrumb"><span>Administração</span><b>/</b><strong id="breadcrumb">Visão geral</strong></div>
         </div>
-        <div class="top-actions">
-          <span class="source-label"><span class="dot"></span> PNCP + Compras.gov.br</span>
-          <span class="avatar" aria-label="Administrador">TI</span>
-        </div>
+        <div class="topbar-actions"><span class="sync-status"><span class="live-dot"></span> Dados atualizados</span><span class="avatar" aria-label="Administrador">TI</span></div>
       </header>
 
-      <div class="content">
-        <div class="notice" role="note"><strong>Aviso:</strong> contratos e contratações são exibidos separadamente. Datas, aditivos e situação jurídica devem ser confirmados pelo setor competente.</div>
+      <div class="page-content">
+        <div class="notice" role="note"><span class="notice-mark">i</span><div><strong>Informação importante</strong><br>As datas vêm dos registros públicos. Confirme aditivos, rescisões e a vigência jurídica com o setor responsável.</div></div>
         <div class="feedback" id="feedback" role="status" aria-live="polite" hidden></div>
 
         <section id="overview" class="view">
-          <div class="page-head">
-            <div><p class="eyebrow">PAINEL DE ACOMPANHAMENTO</p><h1>Visão geral</h1><p class="lead">Controle centralizado de vigências, prazos e responsabilidades.</p></div>
-            <button class="button button-outline" id="refresh" type="button">Atualizar dados</button>
+          <div class="page-header"><div><p class="overline">PAINEL DE ACOMPANHAMENTO</p><h1>Visão geral</h1><p class="page-lead">O que precisa de atenção nos contratos de Turvo.</p></div><button class="button button-secondary" id="refresh" type="button"><span>↻</span> Atualizar dados</button></div>
+          <div class="stats-grid" aria-label="Indicadores de contratos">
+            <article class="metric-card"><div class="metric-top"><span>Contratos importados</span><span class="metric-icon navy">▤</span></div><strong id="stat-all">—</strong><small>Acervo PNCP</small></article>
+            <article class="metric-card"><div class="metric-top"><span>Em vigência</span><span class="metric-icon green">✓</span></div><strong id="stat-active">—</strong><small>Com datas atuais</small></article>
+            <article class="metric-card metric-alert"><div class="metric-top"><span>Vencem em 30 dias</span><span class="metric-icon amber">!</span></div><strong id="stat-upcoming">—</strong><small>Precisam de ação</small></article>
+            <article class="metric-card"><div class="metric-top"><span>Sem área definida</span><span class="metric-icon slate">?</span></div><strong id="stat-unclassified">—</strong><small>Aguardando revisão</small></article>
           </div>
-          <div class="stats" aria-label="Indicadores de contratos">
-            <article class="stat-card"><div class="stat-label">Contratos importados <span class="stat-icon">▣</span></div><strong id="stat-all" class="stat-value">—</strong><span class="stat-foot">Acervo PNCP</span></article>
-            <article class="stat-card"><div class="stat-label">Vigência atual <span class="stat-icon">○</span></div><strong id="stat-active" class="stat-value">—</strong><span class="stat-foot">Conforme datas registradas</span></article>
-            <article class="stat-card attention"><div class="stat-label">Vencem em 30 dias <span class="stat-icon">!</span></div><strong id="stat-upcoming" class="stat-value">—</strong><span class="stat-foot">Requerem acompanhamento</span></article>
-            <article class="stat-card"><div class="stat-label">Sem secretaria <span class="stat-icon">?</span></div><strong id="stat-unclassified" class="stat-value">—</strong><span class="stat-foot">Aguardando classificação</span></article>
+          <div class="dashboard-grid">
+            <article class="card card-chart"><div class="card-heading"><div><h2>Próximos vencimentos</h2><p>Distribuição por área nos próximos 60 dias</p></div><span class="badge">Panorama</span></div><div id="secretary-chart" class="chart-empty">Carregando áreas…</div></article>
+            <article class="card attention-card"><div class="card-heading"><div><h2>Rotina de acompanhamento</h2><p>Passos recomendados para a equipe</p></div></div><div class="routine"><span>01</span><div><b>Receber</b><p>Dados chegam do PNCP automaticamente.</p></div></div><div class="routine"><span>02</span><div><b>Revisar</b><p>Confirme a área e o prazo do contrato.</p></div></div><div class="routine"><span>03</span><div><b>Agir</b><p>Antecipe providências antes do vencimento.</p></div></div><div class="sync-note" id="overview-sync">Sincronização aguardando consulta</div></article>
           </div>
-
-          <div class="two-col">
-            <article class="panel">
-              <div class="panel-head"><div><h2>Vencimentos por secretaria</h2><p>Próximos 60 dias</p></div><span class="tag">Panorama</span></div>
-              <div id="secretary-chart" class="chart-empty">Sem dados classificados para o período.</div>
-            </article>
-            <article class="panel workflow">
-              <div class="panel-head"><div><h2>Acompanhamento operacional</h2><p>Orientações para a equipe</p></div></div>
-              <div class="flow-step"><span class="step-index">01</span><div><strong>Dados recebidos</strong><p>Contratos publicados no PNCP são importados sem digitação manual.</p></div></div>
-              <div class="flow-step"><span class="step-index">02</span><div><strong>Classificação</strong><p>Vincule cada contrato à secretaria responsável.</p></div></div>
-              <div class="flow-step"><span class="step-index">03</span><div><strong>Conferência e alerta</strong><p>Valide o prazo e os destinatários antes de ativar e-mails.</p></div></div>
-              <div class="sync-pill" id="overview-sync">Sincronização ainda não verificada</div>
-            </article>
-          </div>
-
-          <article class="panel table-panel">
-            <div class="panel-head"><div><h2>Vencimentos próximos</h2><p>Contratos com prazo nos próximos 30 dias</p></div><button class="text-button" id="see-all">Ver contratos →</button></div>
-            <div class="table-wrap"><table><thead><tr><th>Contrato</th><th>Fornecedor</th><th>Secretaria</th><th>Vencimento</th><th>Situação</th></tr></thead><tbody id="upcoming-body"><tr><td colspan="5" class="empty">Carregando…</td></tr></tbody></table></div>
-          </article>
+          <article class="card table-card"><div class="card-heading"><div><h2>Próximos vencimentos</h2><p>Os contratos que merecem atenção primeiro</p></div><button class="link-button" id="see-all" type="button">Ver contratos <span>→</span></button></div><div class="table-scroll"><table><thead><tr><th>Contrato</th><th>Fornecedor</th><th>Área</th><th>Vencimento</th><th></th></tr></thead><tbody id="upcoming-body"><tr><td colspan="5" class="empty">Carregando…</td></tr></tbody></table></div></article>
         </section>
 
         <section id="contracts" class="view" hidden>
-          <div class="page-head"><div><p class="eyebrow">ACERVO MUNICIPAL</p><h1>Contratos</h1><p class="lead">Pesquisa, conferência de vigência e atribuição de responsabilidade.</p></div><span class="counter" id="contracts-count">— registros</span></div>
-          <article class="panel table-panel">
-            <div class="filters">
-              <label class="field search-field"><span>Pesquisar contrato, fornecedor ou objeto</span><input id="contract-search" type="search" placeholder="Número, fornecedor ou palavra-chave"></label>
-              <label class="field"><span>Prazo</span><select id="period-filter"><option value="all">Todos os prazos</option><option value="30">Até 30 dias</option><option value="60">Até 60 dias</option><option value="90">Até 90 dias</option><option value="expired">Vigência encerrada</option><option value="unknown">Sem data informada</option></select></label>
-              <label class="field"><span>Secretaria</span><select id="secretary-filter"><option value="">Todas</option></select></label>
-              <button id="clear-calendar-date" class="button button-outline" type="button" hidden>Limpar filtro da data</button>
-            </div>
-            <div class="table-wrap"><table><thead><tr><th>Contrato / ano</th><th>Fornecedor e objeto</th><th>Secretaria responsável</th><th>Vigência final</th><th>Fonte</th></tr></thead><tbody id="contracts-body"><tr><td colspan="5" class="empty">Carregando…</td></tr></tbody></table></div>
-            <div class="pagination"><span id="pagination-text">—</span><div><button class="button button-outline" id="prev" type="button">Anterior</button> <button class="button button-outline" id="next" type="button">Próximo</button></div></div>
-          </article>
+          <div class="page-header"><div><p class="overline">ACERVO MUNICIPAL</p><h1>Contratos</h1><p class="page-lead">Pesquise por número, fornecedor ou objeto.</p></div><span class="count-badge" id="contracts-count">— registros</span></div>
+          <article class="card table-card"><div class="filter-bar"><label class="field search-field"><span>Buscar contratos</span><input id="contract-search" type="search" placeholder="Digite número, fornecedor ou objeto"></label><label class="field compact-field"><span>Prazo</span><select id="period-filter"><option value="all">Todos</option><option value="30">Até 30 dias</option><option value="60">Até 60 dias</option><option value="90">Até 90 dias</option><option value="expired">Encerrados</option><option value="unknown">Sem data</option></select></label><label class="field compact-field"><span>Área responsável</span><select id="secretary-filter"><option value="">Todas</option></select></label><button id="clear-calendar-date" class="button button-secondary" type="button" hidden>Limpar data</button></div><div class="table-scroll"><table><thead><tr><th>Contrato / ano</th><th>Objeto e fornecedor</th><th>Área responsável</th><th>Vigência</th><th>Fonte</th></tr></thead><tbody id="contracts-body"><tr><td colspan="5" class="empty">Carregando…</td></tr></tbody></table></div><div class="pagination"><span id="pagination-text">—</span><div><button class="button button-secondary" id="prev" type="button">Anterior</button><button class="button button-secondary" id="next" type="button">Próximo</button></div></div></article>
         </section>
 
-
         <section id="procurements" class="view" hidden>
-          <div class="page-head"><div><p class="eyebrow">COMPRAS PÚBLICAS</p><h1>Contratações</h1><p class="lead">Licitações, pregões e dispensas publicados no Compras.gov.br. Este acervo não é somado aos contratos.</p></div><span class="counter" id="procurements-count">— registros</span></div>
-          <article class="panel table-panel">
-            <div class="filters"><label class="field search-field"><span>Pesquisar contratação, processo ou objeto</span><input id="procurement-search" type="search" placeholder="Número, processo ou palavra-chave"></label></div>
-            <div class="table-wrap"><table><thead><tr><th>Compra / ano</th><th>Modalidade e situação</th><th>Objeto</th><th>Valores</th><th>Publicação</th></tr></thead><tbody id="procurements-body"><tr><td colspan="5" class="empty">Carregando…</td></tr></tbody></table></div>
-            <div class="pagination"><span id="procurement-pagination-text">—</span><div><button class="button button-outline" id="procurement-prev" type="button">Anterior</button> <button class="button button-outline" id="procurement-next" type="button">Próximo</button></div></div>
-          </article>
+          <div class="page-header"><div><p class="overline">COMPRAS PÚBLICAS</p><h1>Contratações</h1><p class="page-lead">Licitações, pregões e dispensas — separadas dos contratos assinados.</p></div><span class="count-badge" id="procurements-count">— registros</span></div>
+          <article class="card table-card"><div class="filter-bar"><label class="field search-field"><span>Buscar contratações</span><input id="procurement-search" type="search" placeholder="Número, processo ou objeto"></label></div><div class="table-scroll"><table><thead><tr><th>Compra / ano</th><th>Modalidade</th><th>Objeto</th><th>Valores</th><th>Publicação</th></tr></thead><tbody id="procurements-body"><tr><td colspan="5" class="empty">Carregando…</td></tr></tbody></table></div><div class="pagination"><span id="procurement-pagination-text">—</span><div><button class="button button-secondary" id="procurement-prev" type="button">Anterior</button><button class="button button-secondary" id="procurement-next" type="button">Próximo</button></div></div></article>
         </section>
 
         <section id="calendar" class="view" hidden>
-          <div class="page-head">
-            <div>
-              <p class="eyebrow">AGENDA DE VIGÊNCIAS</p>
-              <h1>Calendário de vencimentos</h1>
-              <p class="lead">Visualize prazos por dia e secretaria. Selecione uma data para conferir contratos.</p>
-            </div>
-            <button class="button button-outline" id="calendar-today" type="button">Ir para hoje</button>
-          </div>
-          <div class="calendar-layout">
-            <article class="panel calendar-panel" aria-label="Calendário mensal de vencimentos">
-              <div class="calendar-toolbar">
-                <div>
-                  <p class="eyebrow">VENCIMENTOS DO MÊS</p>
-                  <h2 id="calendar-month-label" aria-live="polite">Carregando calendário…</h2>
-                </div>
-                <div class="calendar-toolbar-actions">
-                  <label class="field calendar-secretary-field">
-                    <span>Filtrar secretaria</span>
-                    <select id="calendar-secretary-filter" aria-label="Filtrar calendário por secretaria"><option value="">Todas as secretarias</option></select>
-                  </label>
-                  <div class="calendar-nav">
-                    <button id="calendar-prev" class="button button-outline" type="button" aria-label="Mês anterior">←</button>
-                    <button id="calendar-next" class="button button-outline" type="button" aria-label="Próximo mês">→</button>
-                  </div>
-                </div>
-              </div>
-              <div class="calendar-context"><span id="calendar-total">— vencimentos no mês</span><span class="calendar-legend"><i></i> Prazo nos próximos 30 dias</span></div>
-              <div class="calendar-scroll">
-                <div class="calendar-weekdays" aria-hidden="true"><span>Seg</span><span>Ter</span><span>Qua</span><span>Qui</span><span>Sex</span><span>Sáb</span><span>Dom</span></div>
-                <div id="calendar-grid" class="calendar-grid" aria-label="Dias do mês"></div>
-              </div>
-              <p class="calendar-disclaimer">Datas e objetos vêm dos contratos importados do PNCP. As contratações do Compras.gov.br ficam na aba própria; aditivos e vigência jurídica precisam de conferência.</p>
-            </article>
-            <aside class="panel calendar-details" aria-label="Vencimentos da data selecionada">
-              <div class="calendar-details-head">
-                <p class="eyebrow">DATA SELECIONADA</p>
-                <h2 id="calendar-selected-date">Selecione um dia</h2>
-                <p id="calendar-selected-count" class="muted">Aguardando calendário.</p>
-              </div>
-              <div id="calendar-day-list" class="calendar-day-list" aria-live="polite">Selecione um dia para consultar os contratos.</div>
-              <button type="button" id="calendar-see-all" class="button button-outline" hidden>Ver todos os contratos desse dia</button>
-            </aside>
-          </div>
+          <div class="page-header"><div><p class="overline">AGENDA OPERACIONAL</p><h1>Calendário de vencimentos</h1><p class="page-lead">Selecione um dia para ver todos os contratos, objetos e responsáveis.</p></div><button class="button button-primary" id="calendar-today" type="button">Ir para hoje</button></div>
+          <div class="calendar-toolbar card"><div class="calendar-title"><span class="calendar-icon">□</span><div><p class="overline">VENCIMENTOS DO MÊS</p><h2 id="calendar-month-label" aria-live="polite">Carregando calendário…</h2></div></div><div class="calendar-actions"><label class="field calendar-filter"><span>Área responsável</span><select id="calendar-secretary-filter" aria-label="Filtrar calendário por área"><option value="">Todas as áreas</option></select></label><div class="month-nav"><button class="icon-button" id="calendar-prev" type="button" aria-label="Mês anterior">‹</button><button class="icon-button" id="calendar-next" type="button" aria-label="Próximo mês">›</button></div></div><div class="calendar-summary"><span id="calendar-total">— vencimentos no mês</span><span><i class="legend-dot"></i> até 30 dias <i class="legend-dot overdue"></i> encerrado</span></div></div>
+          <div class="calendar-layout"><article class="card calendar-card"><div class="calendar-weekdays" aria-hidden="true"><span>Seg</span><span>Ter</span><span>Qua</span><span>Qui</span><span>Sex</span><span>Sáb</span><span>Dom</span></div><div id="calendar-grid" class="calendar-grid" aria-label="Dias do mês"></div><p class="calendar-disclaimer">A agenda mostra datas publicadas. Ela não substitui a conferência de aditivos ou da situação jurídica.</p></article><aside class="card day-panel" aria-label="Vencimentos da data selecionada"><div class="day-panel-heading"><p class="overline">DIA SELECIONADO</p><h2 id="calendar-selected-date">Selecione um dia</h2><p id="calendar-selected-count" class="page-lead">Aguardando calendário.</p></div><div id="calendar-day-list" class="day-list" aria-live="polite">Selecione um dia para consultar os contratos.</div><button type="button" id="calendar-see-all" class="button button-secondary full-button" hidden>Ver na lista de contratos</button></aside></div>
         </section>
 
         <section id="secretaries" class="view" hidden>
-          <div class="page-head"><div><p class="eyebrow">RESPONSABILIDADES</p><h1>Secretarias e áreas</h1><p class="lead">As áreas são sugeridas automaticamente pela unidade oficial do contrato. Gestores e e-mails continuam dependendo de conferência.</p></div></div>
-          <div class="two-col secretaries-layout">
-            <article class="panel">
-              <div class="panel-head"><div><h2>Secretarias cadastradas</h2><p>Responsáveis pelo acompanhamento</p></div></div>
-              <div id="secretary-list" class="secretary-list">Nenhuma secretaria cadastrada.</div>
-            </article>
-            <article class="panel">
-              <div class="panel-head"><div><h2>Nova secretaria</h2><p>O e-mail deve ser validado antes de ativar alertas.</p></div></div>
-              <form id="secretary-form" class="entry-form">
-                <label class="field"><span>Nome da secretaria</span><input id="secretary-name" required maxlength="160" minlength="3" placeholder="Ex.: Secretaria Municipal de Saúde"></label>
-                <label class="field"><span>E-mail institucional (opcional)</span><input id="secretary-email" type="email" maxlength="250" placeholder="setor@turvo.pr.gov.br"></label>
-                <button class="button button-primary" type="submit">Adicionar secretaria</button>
-              </form>
-            </article>
-          </div>
+          <div class="page-header"><div><p class="overline">RESPONSABILIDADES</p><h1>Secretarias e áreas</h1><p class="page-lead">Áreas sugeridas pela unidade oficial; gestores e e-mails precisam ser conferidos.</p></div></div>
+          <div class="dashboard-grid"><article class="card"><div class="card-heading"><div><h2>Áreas encontradas</h2><p>Vínculos automáticos a partir do PNCP</p></div><span class="badge">Automático</span></div><div id="secretary-list" class="secretary-list">Carregando áreas…</div></article><article class="card"><div class="card-heading"><div><h2>Adicionar área</h2><p>Use somente após validar o nome institucional.</p></div></div><form id="secretary-form" class="entry-form"><label class="field"><span>Nome da área</span><input id="secretary-name" required maxlength="160" minlength="3" placeholder="Ex.: Secretaria Municipal de Saúde"></label><label class="field"><span>E-mail institucional opcional</span><input id="secretary-email" type="email" maxlength="250" placeholder="setor@turvo.pr.gov.br"></label><button class="button button-primary" type="submit">Adicionar área</button></form></article></div>
         </section>
 
         <section id="sync" class="view" hidden>
-          <div class="page-head"><div><p class="eyebrow">DADOS E AUDITORIA</p><h1>Sincronização</h1><p class="lead">Histórico de importação do PNCP e integridade das atualizações.</p></div><button class="button button-outline" id="refresh-sync">Recarregar</button></div>
-          <div class="two-col">
-            <article class="panel"><div class="panel-head"><div><h2>Importação histórica</h2><p>Cursor avançado somente após janela concluída</p></div></div><div class="metric-label">Próxima data de publicação a processar</div><div class="metric-large" id="cursor-date">—</div><p class="muted">A importação retroativa e a busca de atualizações acontecem no worker, sem impedir o uso do painel.</p></article>
-            <article class="panel"><div class="panel-head"><div><h2>Notificações</h2><p>Proteção antes da homologação</p></div></div><span class="tag tag-warning">Desativadas por padrão</span><p class="muted">Após classificar os contratos, validar e-mails e configurar o SMTP no Coolify, habilite ALERTS_ENABLED=true.</p><p class="muted">A régua contempla 120, 90, 60, 30, 15, 7 e 0 dias.</p></article>
-          </div>
-          <article class="panel table-panel"><div class="panel-head"><div><h2>Últimas execuções</h2><p>Erros são registrados e não apagam contratos já armazenados</p></div></div><div class="table-wrap"><table><thead><tr><th>Rotina</th><th>Início</th><th>Processados</th><th>Estado</th></tr></thead><tbody id="sync-body"><tr><td colspan="4" class="empty">Nenhuma execução registrada.</td></tr></tbody></table></div></article>
+          <div class="page-header"><div><p class="overline">DADOS E AUDITORIA</p><h1>Sincronização</h1><p class="page-lead">Acompanhe a atualização do PNCP e do Compras.gov.br.</p></div><button class="button button-secondary" id="refresh-sync" type="button">Recarregar</button></div>
+          <div class="dashboard-grid"><article class="card"><div class="card-heading"><div><h2>Importação histórica</h2><p>O cursor só avança após uma janela concluída.</p></div></div><span class="data-label">PRÓXIMA DATA</span><strong class="big-value" id="cursor-date">—</strong><p class="muted">Contratos e contratações são atualizados pelo worker sem bloquear o painel.</p></article><article class="card"><div class="card-heading"><div><h2>Notificações</h2><p>Proteção antes da homologação</p></div></div><span class="badge badge-warning">Desativadas</span><p class="muted">Os alertas permanecem desligados. Primeiro valide áreas, e-mails e SMTP.</p></article></div>
+          <article class="card table-card"><div class="card-heading"><div><h2>Últimas execuções</h2><p>Falhas não apagam os dados já armazenados.</p></div></div><div class="table-scroll"><table><thead><tr><th>Rotina</th><th>Início</th><th>Processados</th><th>Estado</th></tr></thead><tbody id="sync-body"><tr><td colspan="4" class="empty">Nenhuma execução registrada.</td></tr></tbody></table></div></article>
         </section>
       </div>
-      <footer class="footer"><span>Contratos Turvo · Informação pública com gestão interna</span><span>Dados oficiais: PNCP e Compras.gov.br</span></footer>
+      <footer class="footer"><span>Contratos Turvo · Informação pública com gestão interna</span><span>PNCP + Compras.gov.br</span></footer>
     </main>
   </div>
 </body>
