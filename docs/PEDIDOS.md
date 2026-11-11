@@ -37,3 +37,13 @@ Cada solicitação de alteração deve gerar entrada rastreável, commit(s), tes
 **Pedido:** importar também as contratações do Compras.gov.br, sem misturá-las aos contratos, e mostrar todos os contratos do dia no calendário com objeto.
 
 **Implementação:** tabela/API/tela próprias para contratações; calendário retorna os itens completos do mês e não depende do limite paginado da tabela.
+
+## CT-0004 — 2026-11-11 — Refatoração visual e agenda operacional
+
+**Pedido:** refazer a aplicação com uma experiência UI/UX mais clara, corrigindo principalmente o calendário e mantendo a aplicação instalável no Coolify.
+
+**Implementação:** frontend existente em HTML/CSS/JS reorganizado com primitives visuais inspirados no shadcn, sem introduzir React/Tailwind no backend FastAPI; calendário com seleção automática do primeiro vencimento do mês, painel detalhado por dia, filtro por área, link contextual do PNCP e layout responsivo.
+
+**Aceite técnico:** JavaScript válido, testes automatizados verdes, configuração Compose válida, deploy sem alteração de volumes/serviços e smoke test de saúde, autenticação e assets.
+
+**Status:** pronto para homologação visual e funcional em produção; alertas de e-mail continuam desligados.
