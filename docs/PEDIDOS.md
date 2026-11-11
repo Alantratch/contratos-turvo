@@ -4,6 +4,8 @@ Cada solicitação de alteração deve gerar entrada rastreável, commit(s), tes
 
 ## CT-0001 — 2026-11-11 — Versionamento por pedido, interface moderna e calendário
 
+**Meta vinculada:** [Issue #1](https://github.com/Alantratch/contratos-turvo/issues/1).
+
 **Pedido:** versionar todas as alterações feitas a partir da conversa, instruir agentes claramente, estabelecer meta de fazer o sistema funcionar no Coolify localhost e acrescentar calendário mensal de vencimentos.
 
 **Entregáveis:**

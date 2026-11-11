@@ -1,5 +1,7 @@
 # Meta operacional — Contratos Turvo
 
+**Acompanhamento contínuo:** [Meta de implantação no Coolify — Issue #1](https://github.com/Alantratch/contratos-turvo/issues/1).
+
 **Estado em 11/11/2026:** código versionado, MVP e testes de CI; implantação em `localhost` ainda não comprovada. Os testes de integração com dados reais do PNCP e a conferência dos aditivos ainda são pendências. Não rotular como produção homologada sem satisfazer os critérios.
 
 ## Resultado almejado
