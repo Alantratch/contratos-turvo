@@ -2,6 +2,7 @@
 
 ## Fontes
 - Termos de contrato: GET /api/pncp/v1/orgaos/{cnpj}/contratos/{ano}/{sequencial}/termos; retorna aditivos, apostilamentos e outros termos vinculados ao contrato.
+- Portal de Transparência/Equiplano de Turvo: `https://turvopr.equiplano.com.br:7069/transparencia/contratos`; cobre contratos e aditivos que não aparecem no PNCP.
 - Consulta oficial PNCP: https://pncp.gov.br/api/consulta/swagger-ui/index.html
 - Consulta por data de publicação: `GET /v1/contratos` com `dataInicial`, `dataFinal`, `cnpjOrgao`, `pagina`, `tamanhoPagina`.
 - Atualização global: `GET /v1/contratos/atualizacao` (confirmar comportamento em testes de integração reais).
@@ -15,6 +16,7 @@
 - contract_terms: termos publicados pelo PNCP vinculados ao contrato-base, com objeto, tipo, valores, prazo e vigência.
 - `contracts`: chave PNCP única, fornecedor, objeto, valores, vigência, unidade, classificação e JSON original.
 - `procurements`: chave PNCP da contratação, modalidade, situação, objeto, processo, valores e datas do Compras.gov.br.
+- `contracts` usa uma chave de origem; registros `pncp_key` iniciados por `equiplano:` vêm do Portal de Transparência e não têm link PNCP.
 - `contract_revisions`: snapshots de cada versão distinta observada após a instalação; **não** é o histórico prévio integral de todos os aditivos.
 - `secretaries`: secretaria e endereço de alerta validado.
 - `sync_state`: cursor do backfill por publicação; só avança após janela processada.

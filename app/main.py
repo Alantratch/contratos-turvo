@@ -137,12 +137,13 @@ def contracts(
     today = date.today()
     stmt = select(Contract)
     if q.strip():
-        term = "%" + q.strip() + "%"
-        stmt = stmt.where(or_(
-            Contract.number.ilike(term), Contract.supplier.ilike(term), Contract.object.ilike(term),
-            Contract.terms.any(ContractTerm.number.ilike(term)),
-            Contract.terms.any(ContractTerm.object.ilike(term)),
-        ))
+        for word in q.split():
+            term = "%" + word + "%"
+            stmt = stmt.where(or_(
+                Contract.number.ilike(term), Contract.supplier.ilike(term), Contract.object.ilike(term),
+                Contract.terms.any(ContractTerm.number.ilike(term)),
+                Contract.terms.any(ContractTerm.object.ilike(term)),
+            ))
     if secretary_id is not None:
         stmt = stmt.where(Contract.secretary_id == secretary_id)
     if due_date is not None:

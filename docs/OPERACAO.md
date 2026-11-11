@@ -13,6 +13,7 @@
 - Web: healthy; `GET /healthz` deve retornar `{"status":"ok"}`.
 - Dashboard: primeiro acesso deve pedir login HTTP Basic (credenciais do Coolify).
 - Sincronização: painel mostra `next_publication_day`; evolui por janelas de 30 dias a cada ciclo. Erros não devem mover o cursor.
+- Equiplano: confira uma execução `equiplano` no painel. `EQUIPLANO_START_YEAR=2021` faz o backfill dos contratos e aditivos desde 2021; `EQUIPLANO_VERIFY_TLS=false` é uma exceção temporária porque o portal público entrega cadeia TLS incompleta.
 - Conferir amostra de pelo menos 10 contratos no PNCP, inclusive datas de vigência, aditivos e órgão.
 - Validar quem são os fiscais e os endereços da secretaria antes de ativar alertas.
 

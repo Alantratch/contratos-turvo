@@ -4,7 +4,7 @@ from app.core import (
     auto_classify_contract_units, engine, parse_date, serialize_contract, upsert_contract,
     upsert_contract_term, upsert_procurement,
 )
-from app.worker import alert_threshold
+from app.worker import alert_threshold, equiplano_amount, equiplano_date_range, equiplano_payload, equiplano_table
 from sqlalchemy import select
 
 
@@ -136,6 +136,20 @@ def test_api_requires_auth_and_serves_dashboard():
         assert client.get("/assets/app.js", auth=auth).status_code == 200
 
 
+def test_contract_search_matches_all_supplier_words():
+    from fastapi.testclient import TestClient
+    payload = sample()
+    payload["numeroControlePNCP"] = "78279973000107-2-00005/2026"
+    payload["nomeRazaoSocialFornecedor"] = "IDS DESENVOLVIMENTO DE SOFTWARE E ASSESSORIA LTDA"
+    with SessionLocal() as db:
+        upsert_contract(db, payload)
+        db.commit()
+    with TestClient(__import__("app.main", fromlist=["app"]).app) as client:
+        response = client.get("/api/contracts?q=IDS+SOFTWARE&period=all", auth=("test", "test-password"))
+    assert response.status_code == 200
+    assert response.json()["total"] >= 1
+
+
 def test_pncp_adapter_pagination_and_cnpj_filter():
     import httpx
     from app.worker import pages
@@ -209,3 +223,33 @@ def test_calendar_returns_all_contracts_and_objects_for_a_day():
     day = next(d for d in data["days"] if d["date"] == "2026-12-31")
     assert day["count"] >= 2
     assert {item["object"] for item in day["items"]} >= {"Objeto teste", "Segundo objeto"}
+
+
+def test_equiplano_rows_keep_supplier_object_dates_and_amount():
+    html = """
+    <table id="td"><tbody><tr>
+      <td><a href="verContrato?formulario.idContrato=3015">abrir</a></td>
+      <td>76</td><td></td><td>Contrato</td><td>Prestação de serviços</td><td></td>
+      <td>22/04/2021 - 21/04/2022</td><td>22/04/2021 - 31/05/2027</td>
+      <td>20 / 2021 - Pregão</td><td>185.280,00</td><td>Município de Turvo</td>
+    </tr></tbody></table>
+    """
+    rows = equiplano_table(html)
+    payload = equiplano_payload(2021, rows[0], {
+        "supplier": "VIEIRA E RETECHESKI LTDA",
+        "object": "Internet municipal",
+    })
+    assert payload["numeroControlePNCP"] == "equiplano:2021:3015"
+    assert payload["dataVigenciaFim"] == "2022-04-21"
+    assert payload["valorGlobal"] == "185280.00"
+    assert payload["nomeRazaoSocialFornecedor"] == "VIEIRA E RETECHESKI LTDA"
+    assert equiplano_date_range("27/05/2026 - 31/05/2027")[1] == date(2027, 5, 31)
+    assert equiplano_amount("-83.618,84") == "-83618.84"
+
+    export_rows = equiplano_table("""
+      <table><tr><td>76</td><td></td><td>Contrato</td><td>Prestação</td><td></td>
+      <td>22/04/2021 - 21/04/2022</td><td>22/04/2021 - 31/05/2027</td>
+      <td>20 / 2021</td><td>185.280,00</td><td>Município de Turvo</td></tr></table>
+    """)
+    export_payload = equiplano_payload(2021, export_rows[0], {"supplier": "VIEIRA"})
+    assert export_payload["numeroControlePNCP"] == "equiplano:2021:numero-76"
