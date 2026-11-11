@@ -1,5 +1,10 @@
 # Histórico de versões
 
+## [0.7.0] — 2026-11-11
+- Refatoração visual completa da camada administrativa com primitives inspirados no shadcn/ui: superfícies neutras, bordas sutis, controles compactos, estados semânticos e navegação com ícones SVG acessíveis.
+- Calendário, tabelas, filtros, indicadores e estados de sincronização receberam a mesma linguagem visual responsiva, sem alterar rotas, dados, autenticação ou alertas.
+- Nenhuma dependência nova foi adicionada; a aplicação continua servida pelo HTML/CSS/JS existente.
+
 ## [0.6.0] — 2026-11-11
 - Integração do Portal de Transparência/Equiplano, que contém contratos e aditivos não publicados no PNCP.
 - Backfill desde 2021, com vigência, objeto, fornecedor e aditivos vinculados ao contrato-base.

@@ -2,6 +2,18 @@
 
 Cada solicitação de alteração deve gerar entrada rastreável, commit(s), testes e status de implantação. Commits são o histórico imutável; este registro fornece contexto e critérios de aceite. Não gravar segredos.
 
+## CT-0007 — 2026-11-11 — Linguagem visual shadcn/ui
+
+**Pedido:** refatorar os designs para uma interface moderna e estilizada, removendo a aparência genérica de IA.
+
+**Implementação:** a camada HTML/CSS/JS existente recebeu primitives visuais inspirados no shadcn/ui: tokens neutros, sidebar clara, controles compactos, bordas discretas, estados semânticos, ícones SVG inline e calendário com composição mais limpa. Textos de operação foram simplificados para uma linguagem de sistema administrativo.
+
+**Escopo preservado:** nenhuma rota, API, regra de importação, autenticação, dado, volume ou serviço foi alterado; alertas de e-mail permanecem desligados. Não foi introduzido React, Tailwind ou dependência nova porque a aplicação atual já entrega a mesma experiência com HTML/CSS/JS.
+
+**Aceite técnico:** JavaScript válido, diff sem erros de whitespace, smoke test de saúde e validação visual da página publicada.
+
+**Status:** pronto para homologação.
+
 ## CT-0001 — 2026-11-11 — Versionamento por pedido, interface moderna e calendário
 
 **Meta vinculada:** [Issue #1](https://github.com/Alantratch/contratos-turvo/issues/1).
