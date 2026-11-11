@@ -4,7 +4,7 @@ from app.core import (
     auto_classify_contract_units, engine, parse_date, serialize_contract, upsert_contract,
     upsert_contract_term, upsert_procurement,
 )
-from app.worker import alert_threshold, equiplano_amount, equiplano_date_range, equiplano_payload, equiplano_table
+from app.worker import alert_threshold, equiplano_amount, equiplano_date_range, equiplano_object, equiplano_payload, equiplano_table
 from sqlalchemy import select
 
 
@@ -245,6 +245,7 @@ def test_equiplano_rows_keep_supplier_object_dates_and_amount():
     assert payload["nomeRazaoSocialFornecedor"] == "VIEIRA E RETECHESKI LTDA"
     assert equiplano_date_range("27/05/2026 - 31/05/2027")[1] == date(2027, 5, 31)
     assert equiplano_amount("-83.618,84") == "-83618.84"
+    assert equiplano_object(".") == ""
 
     export_rows = equiplano_table("""
       <table><tr><td>76</td><td></td><td>Contrato</td><td>Prestação</td><td></td>

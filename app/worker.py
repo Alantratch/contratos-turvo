@@ -247,6 +247,11 @@ def equiplano_amount(value: str) -> str | None:
     return value.replace(".", "").replace(",", ".")
 
 
+def equiplano_object(value: str) -> str:
+    value = str(value or "").strip()
+    return "" if value in {".", "-", "—"} else value
+
+
 def equiplano_query(year: int) -> str:
     params = {
         "formulario.codEntidade": "69",
@@ -296,7 +301,7 @@ def equiplano_supplier_index(client: httpx.Client, year: int) -> dict[tuple[int,
             number = match.group(1).strip()
             index[(year, number)] = {
                 "supplier": supplier,
-                "object": str(row[4] or "").strip(),
+                "object": equiplano_object(row[4]),
                 "amount": str(row[3] or "").strip(),
             }
     return index
