@@ -59,6 +59,7 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 3px s
 
 .page-content { width: 100%; max-width: 1540px; flex: 1; margin: 0 auto; padding: 26px 38px 44px; }
 .notice, .feedback { display: flex; gap: 10px; align-items: flex-start; margin-bottom: 22px; padding: 12px 14px; border: 1px solid #cfe1ef; border-radius: 8px; background: #f0f7fc; color: #35536d; font-size: 12px; line-height: 1.5; }
+.feedback[hidden], .view[hidden] { display: none !important; }
 .notice-mark { display: inline-grid; width: 18px; height: 18px; flex: 0 0 18px; place-items: center; border-radius: 50%; background: #d6e9f5; color: var(--navy); font-size: 11px; font-weight: 800; }
 .feedback { border-color: #bfe4cf; background: var(--green-soft); color: #146340; }
 .page-header { display: flex; align-items: flex-end; justify-content: space-between; gap: 20px; margin-bottom: 22px; }
