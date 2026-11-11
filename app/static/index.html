@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#082d53">
+  <meta name="robots" content="noindex,nofollow">
+  <title>Gestão de Contratos · Turvo/PR</title>
+  <link rel="stylesheet" href="/assets/style.css">
+  <script defer src="/assets/app.js"></script>
+</head>
+<body>
+  <div class="shell">
+    <aside class="sidebar" id="sidebar">
+      <div class="brand">
+        <span class="brand-mark" aria-hidden="true">T</span>
+        <div><strong>TURVO</strong><small>Gestão Municipal</small></div>
+      </div>
+      <div class="side-label">ÁREA DE TRABALHO</div>
+      <nav class="nav" aria-label="Navegação principal">
+        <button class="nav-item selected" data-view="overview" aria-current="page"><span class="nav-icon" aria-hidden="true">▦</span> Visão geral</button>
+        <button class="nav-item" data-view="contracts"><span class="nav-icon" aria-hidden="true">▤</span> Contratos</button>
+        <button class="nav-item" data-view="secretaries"><span class="nav-icon" aria-hidden="true">▥</span> Secretarias</button>
+        <button class="nav-item" data-view="sync"><span class="nav-icon" aria-hidden="true">↻</span> Sincronização</button>
+      </nav>
+      <div class="sidebar-bottom">
+        <div class="side-info"><span class="dot"></span> Fonte oficial PNCP</div>
+        <p>Dados públicos importados. Confira atos, aditivos e vigências antes de tomar decisões.</p>
+        <small>Prefeitura Municipal de Turvo · Paraná</small>
+      </div>
+    </aside>
+
+    <main class="main">
+      <header class="topbar">
+        <div class="topbar-left">
+          <button class="menu-toggle" id="menu-toggle" aria-label="Abrir menu" aria-expanded="false">☰</button>
+          <span class="breadcrumb">Administração <span class="chevron">/</span> <strong id="breadcrumb">Visão geral</strong></span>
+        </div>
+        <div class="top-actions">
+          <span class="source-label"><span class="dot"></span> PNCP</span>
+          <span class="avatar" aria-label="Administrador">TI</span>
+        </div>
+      </header>
+
+      <div class="content">
+        <div class="notice" role="note"><strong>Aviso:</strong> o painel exibe datas publicadas no PNCP; a situação contratual e os aditivos devem ser confirmados pelo setor competente.</div>
+        <div class="feedback" id="feedback" role="status" aria-live="polite" hidden></div>
+
+        <section id="overview" class="view">
+          <div class="page-head">
+            <div><p class="eyebrow">PAINEL DE ACOMPANHAMENTO</p><h1>Visão geral</h1><p class="lead">Controle centralizado de vigências, prazos e responsabilidades.</p></div>
+            <button class="button button-outline" id="refresh" type="button">Atualizar dados</button>
+          </div>
+          <div class="stats" aria-label="Indicadores de contratos">
+            <article class="stat-card"><div class="stat-label">Contratos importados <span class="stat-icon">▣</span></div><strong id="stat-all" class="stat-value">—</strong><span class="stat-foot">Acervo PNCP</span></article>
+            <article class="stat-card"><div class="stat-label">Vigência atual <span class="stat-icon">○</span></div><strong id="stat-active" class="stat-value">—</strong><span class="stat-foot">Conforme datas registradas</span></article>
+            <article class="stat-card attention"><div class="stat-label">Vencem em 30 dias <span class="stat-icon">!</span></div><strong id="stat-upcoming" class="stat-value">—</strong><span class="stat-foot">Requerem acompanhamento</span></article>
+            <article class="stat-card"><div class="stat-label">Sem secretaria <span class="stat-icon">?</span></div><strong id="stat-unclassified" class="stat-value">—</strong><span class="stat-foot">Aguardando classificação</span></article>
+          </div>
+
+          <div class="two-col">
+            <article class="panel">
+              <div class="panel-head"><div><h2>Vencimentos por secretaria</h2><p>Próximos 60 dias</p></div><span class="tag">Panorama</span></div>
+              <div id="secretary-chart" class="chart-empty">Sem dados classificados para o período.</div>
+            </article>
+            <article class="panel workflow">
+              <div class="panel-head"><div><h2>Acompanhamento operacional</h2><p>Orientações para a equipe</p></div></div>
+              <div class="flow-step"><span class="step-index">01</span><div><strong>Dados recebidos</strong><p>Contratos publicados no PNCP são importados sem digitação manual.</p></div></div>
+              <div class="flow-step"><span class="step-index">02</span><div><strong>Classificação</strong><p>Vincule cada contrato à secretaria responsável.</p></div></div>
+              <div class="flow-step"><span class="step-index">03</span><div><strong>Conferência e alerta</strong><p>Valide o prazo e os destinatários antes de ativar e-mails.</p></div></div>
+              <div class="sync-pill" id="overview-sync">Sincronização ainda não verificada</div>
+            </article>
+          </div>
+
+          <article class="panel table-panel">
+            <div class="panel-head"><div><h2>Vencimentos próximos</h2><p>Contratos com prazo nos próximos 30 dias</p></div><button class="text-button" id="see-all">Ver contratos →</button></div>
+            <div class="table-wrap"><table><thead><tr><th>Contrato</th><th>Fornecedor</th><th>Secretaria</th><th>Vencimento</th><th>Situação</th></tr></thead><tbody id="upcoming-body"><tr><td colspan="5" class="empty">Carregando…</td></tr></tbody></table></div>
+          </article>
+        </section>
+
+        <section id="contracts" class="view" hidden>
+          <div class="page-head"><div><p class="eyebrow">ACERVO MUNICIPAL</p><h1>Contratos</h1><p class="lead">Pesquisa, conferência de vigência e atribuição de responsabilidade.</p></div><span class="counter" id="contracts-count">— registros</span></div>
+          <article class="panel table-panel">
+            <div class="filters">
+              <label class="field search-field"><span>Pesquisar contrato, fornecedor ou objeto</span><input id="contract-search" type="search" placeholder="Número, fornecedor ou palavra-chave"></label>
+              <label class="field"><span>Prazo</span><select id="period-filter"><option value="all">Todos os prazos</option><option value="30">Até 30 dias</option><option value="60">Até 60 dias</option><option value="90">Até 90 dias</option><option value="expired">Vigência encerrada</option><option value="unknown">Sem data informada</option></select></label>
+              <label class="field"><span>Secretaria</span><select id="secretary-filter"><option value="">Todas</option></select></label>
+            </div>
+            <div class="table-wrap"><table><thead><tr><th>Contrato / ano</th><th>Fornecedor e objeto</th><th>Secretaria responsável</th><th>Vigência final</th><th>Fonte</th></tr></thead><tbody id="contracts-body"><tr><td colspan="5" class="empty">Carregando…</td></tr></tbody></table></div>
+            <div class="pagination"><span id="pagination-text">—</span><div><button class="button button-outline" id="prev" type="button">Anterior</button> <button class="button button-outline" id="next" type="button">Próximo</button></div></div>
+          </article>
+        </section>
+
+        <section id="secretaries" class="view" hidden>
+          <div class="page-head"><div><p class="eyebrow">RESPONSABILIDADES</p><h1>Secretarias</h1><p class="lead">Cadastre as áreas e os endereços institucionais de notificação.</p></div></div>
+          <div class="two-col secretaries-layout">
+            <article class="panel">
+              <div class="panel-head"><div><h2>Secretarias cadastradas</h2><p>Responsáveis pelo acompanhamento</p></div></div>
+              <div id="secretary-list" class="secretary-list">Nenhuma secretaria cadastrada.</div>
+            </article>
+            <article class="panel">
+              <div class="panel-head"><div><h2>Nova secretaria</h2><p>O e-mail deve ser validado antes de ativar alertas.</p></div></div>
+              <form id="secretary-form" class="entry-form">
+                <label class="field"><span>Nome da secretaria</span><input id="secretary-name" required maxlength="160" minlength="3" placeholder="Ex.: Secretaria Municipal de Saúde"></label>
+                <label class="field"><span>E-mail institucional (opcional)</span><input id="secretary-email" type="email" maxlength="250" placeholder="setor@turvo.pr.gov.br"></label>
+                <button class="button button-primary" type="submit">Adicionar secretaria</button>
+              </form>
+            </article>
+          </div>
+        </section>
+
+        <section id="sync" class="view" hidden>
+          <div class="page-head"><div><p class="eyebrow">DADOS E AUDITORIA</p><h1>Sincronização</h1><p class="lead">Histórico de importação do PNCP e integridade das atualizações.</p></div><button class="button button-outline" id="refresh-sync">Recarregar</button></div>
+          <div class="two-col">
+            <article class="panel"><div class="panel-head"><div><h2>Importação histórica</h2><p>Cursor avançado somente após janela concluída</p></div></div><div class="metric-label">Próxima data de publicação a processar</div><div class="metric-large" id="cursor-date">—</div><p class="muted">A importação retroativa e a busca de atualizações acontecem no worker, sem impedir o uso do painel.</p></article>
+            <article class="panel"><div class="panel-head"><div><h2>Notificações</h2><p>Proteção antes da homologação</p></div></div><span class="tag tag-warning">Desativadas por padrão</span><p class="muted">Após classificar os contratos, validar e-mails e configurar o SMTP no Coolify, habilite ALERTS_ENABLED=true.</p><p class="muted">A régua contempla 120, 90, 60, 30, 15, 7 e 0 dias.</p></article>
+          </div>
+          <article class="panel table-panel"><div class="panel-head"><div><h2>Últimas execuções</h2><p>Erros são registrados e não apagam contratos já armazenados</p></div></div><div class="table-wrap"><table><thead><tr><th>Rotina</th><th>Início</th><th>Processados</th><th>Estado</th></tr></thead><tbody id="sync-body"><tr><td colspan="4" class="empty">Nenhuma execução registrada.</td></tr></tbody></table></div></article>
+        </section>
+      </div>
+      <footer class="footer"><span>Contratos Turvo · Informação pública com gestão interna</span><span>Dados oficiais: PNCP</span></footer>
+    </main>
+  </div>
+</body>
+</html>
