@@ -35,6 +35,8 @@ def pages(client: httpx.Client, endpoint: str, begin: date, end: date):
                 response = client.get(BASE + endpoint, params=query)
                 if response.status_code in (429, 500, 502, 503, 504):
                     raise httpx.HTTPStatusError("PNCP temporariamente indisponível", request=response.request, response=response)
+                if response.status_code == 204:
+                    return
                 response.raise_for_status()
                 body = response.json()
                 break
