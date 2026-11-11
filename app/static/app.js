@@ -129,8 +129,13 @@
       $("contracts-body").innerHTML = result.items.length ? result.items.map((c) => {
         const eligibleLink = /^\d{14}$/.test(c.buyer_cnpj || "") && Number.isInteger(c.year) && Number.isInteger(c.sequence);
         const link = eligibleLink ? '<a target="_blank" rel="noopener noreferrer" href="https://pncp.gov.br/app/contratos/' + c.buyer_cnpj + '/' + c.year + '/' + c.sequence + '">Abrir PNCP ↗</a>' : "Referência indisponível";
+        const termDetails = (c.terms || []).map(term =>
+          '<span class="term-row"><b>' + html(term.type_name || "Termo") + ' ' + html(term.number || ("#" + term.sequence)) + ':</b> ' +
+          html((term.object || "Objeto do termo não informado").slice(0, 110)) + '</span>'
+        ).join("");
+        const terms = c.terms_count ? '<span class="term-count">' + number(c.terms_count) + ' aditivo(s)/termo(s) publicado(s)</span>' + termDetails : '<span class="subline">Nenhum aditivo publicado</span>';
         return '<tr><td><strong>' + html(c.number || c.pncp_key) + '</strong><span class="subline">' + html(c.year || "") + '</span></td>' +
-          '<td><strong>' + html(c.supplier || "Não informado") + '</strong><span class="subline">' + html((c.object || "Objeto não informado").slice(0, 160)) + '</span><span class="subline">' + money(c.amount) + '</span></td>' +
+          '<td><strong>' + html(c.supplier || "Não informado") + '</strong><span class="subline">' + html((c.object || "Objeto não informado").slice(0, 160)) + '</span><span class="subline">' + money(c.amount) + '</span>' + terms + '</td>' +
           '<td><select class="assign-select" aria-label="Secretaria do contrato ' + html(c.number) + '" data-id="' + c.id + '">' + secretaryOptions(c.secretary_id) + '</select></td>' +
           '<td><strong>' + date(c.end_date) + '</strong><span class="subline">' + status(c.end_date) + '</span></td>' +
           '<td>' + link + '</td></tr>';
@@ -248,11 +253,16 @@
     $("calendar-day-list").innerHTML = items.length ? items.map(c => {
       const hasPncpLink = /^\d{14}$/.test(c.buyer_cnpj || "") && Number.isInteger(c.year) && Number.isInteger(c.sequence);
       const pncpLink = hasPncpLink ? '<a class="entry-link" target="_blank" rel="noopener noreferrer" href="https://pncp.gov.br/app/contratos/' + c.buyer_cnpj + '/' + c.year + '/' + c.sequence + '">Abrir no PNCP ↗</a>' : "";
+      const termDetails = (c.terms || []).map(term =>
+        '<div class="term-detail"><div class="term-heading"><strong>' + html(term.type_name || "Termo contratual") + ' ' + html(term.number || ("#" + term.sequence)) + '</strong><span>' + date(term.end_date) + '</span></div><p>' +
+        html(term.object || "Objeto do termo não informado") + '</p><small>Publicado em ' + date(term.published_at) + (term.amount_added ? ' · Acréscimo: ' + money(term.amount_added) : '') + '</small></div>'
+      ).join("");
+      const termsMarkup = c.terms_count ? '<div class="term-summary"><b>' + number(c.terms_count) + ' aditivo(s)/termo(s)</b>' + termDetails + '</div>' : "";
       return '<article class="calendar-entry"><div class="entry-top"><strong>' + html(c.number || c.pncp_key) + '</strong>' + status(c.end_date) +
         '</div><p class="calendar-entry-object">' + html(c.object || "Objeto não informado") + '</p><small>' +
         html(c.supplier || "Fornecedor não informado") + '</small><small>' +
         html(c.secretary || "Sem secretaria definida") + '</small><small class="calendar-entry-object">' +
-        html(money(c.amount)) + '</small>' + pncpLink + '</article>';
+        html(money(c.amount)) + '</small>' + termsMarkup + pncpLink + '</article>';
     }).join("") : '<p class="muted calendar-empty">Nenhum contrato com vencimento registrado nesse dia.</p>';
     $("calendar-see-all").hidden = items.length === 0;
   }

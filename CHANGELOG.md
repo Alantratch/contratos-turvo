@@ -1,5 +1,10 @@
 # Histórico de versões
 
+## [0.5.0] — 2026-11-11
+- Sincronização dos termos de cada contrato pelo endpoint oficial do PNCP, incluindo aditivos, apostilamentos e rescisões publicados.
+- Aditivos ficam vinculados ao contrato original, aparecem na busca/calendário e atualizam a vigência efetiva quando o termo informa prorrogação.
+- Histórico de contratos permanece iniciado em 2021; termos são consultados para todos os contratos importados até o ciclo atual.
+
 ## [0.4.0] — 2026-11-11
 - Interface administrativa refeita com layout responsivo, hierarquia visual e estados de carregamento/vazio mais claros.
 - Calendário reorganizado como agenda operacional: primeiro vencimento real selecionado, contagem por dia e painel lateral com objeto, fornecedor, área, valor, status e link do PNCP.

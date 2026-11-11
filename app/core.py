@@ -8,7 +8,7 @@ import re
 from datetime import date, datetime, timezone
 from decimal import Decimal, InvalidOperation
 
-from sqlalchemy import Date, DateTime, ForeignKey, Integer, JSON, Numeric, String, Text, create_engine, select
+from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Integer, JSON, Numeric, String, Text, create_engine, select
 from sqlalchemy.orm import DeclarativeBase, Mapped, Session, mapped_column, relationship, sessionmaker
 
 DATABASE_URL = os.getenv("DATABASE_URL")
@@ -56,6 +56,37 @@ class Contract(Base):
     raw: Mapped[dict] = mapped_column(JSON)
     first_seen_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     last_seen_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    terms: Mapped[list["ContractTerm"]] = relationship(
+        back_populates="contract", cascade="all, delete-orphan", lazy="selectin",
+        order_by="ContractTerm.sequence",
+    )
+
+
+class ContractTerm(Base):
+    """Termo contratual publicado pelo PNCP, incluindo aditivo e apostilamento."""
+    __tablename__ = "contract_terms"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    term_key: Mapped[str] = mapped_column(String(150), unique=True, index=True)
+    contract_id: Mapped[int] = mapped_column(ForeignKey("contracts.id"), index=True)
+    sequence: Mapped[int] = mapped_column(Integer)
+    number: Mapped[str] = mapped_column(String(70), default="")
+    type_id: Mapped[int | None] = mapped_column(Integer)
+    type_name: Mapped[str] = mapped_column(String(120), default="")
+    object: Mapped[str] = mapped_column(Text, default="")
+    signed_date: Mapped[date | None] = mapped_column(Date)
+    start_date: Mapped[date | None] = mapped_column(Date)
+    end_date: Mapped[date | None] = mapped_column(Date)
+    published_at: Mapped[date | None] = mapped_column(Date)
+    amount_added: Mapped[Decimal | None] = mapped_column(Numeric(18, 2))
+    global_amount: Mapped[Decimal | None] = mapped_column(Numeric(18, 2))
+    deadline_days: Mapped[int | None] = mapped_column(Integer)
+    qualifies_amount: Mapped[bool] = mapped_column(Boolean, default=False)
+    qualifies_duration: Mapped[bool] = mapped_column(Boolean, default=False)
+    excluded: Mapped[bool] = mapped_column(Boolean, default=False)
+    digest: Mapped[str] = mapped_column(String(64))
+    raw: Mapped[dict] = mapped_column(JSON)
+    last_seen_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    contract: Mapped[Contract] = relationship(back_populates="terms")
 
 
 class Procurement(Base):
@@ -147,6 +178,13 @@ def parse_amount(value) -> Decimal | None:
         return None
 
 
+def parse_int(value) -> int | None:
+    try:
+        return int(value) if value is not None else None
+    except (TypeError, ValueError):
+        return None
+
+
 def upsert_contract(session: Session, payload: dict) -> str:
     """Importa somente o CNPJ-alvo. Preserva secretaria e snapshots em alterações."""
     if not isinstance(payload, dict):
@@ -190,6 +228,70 @@ def upsert_contract(session: Session, payload: dict) -> str:
             setattr(current, column, value)
     session.flush()
     session.add(ContractRevision(contract_id=current.id, digest=digest, raw=raw))
+    return status
+
+
+def refresh_contract_effective_fields(contract: Contract) -> None:
+    """Aplica ao contrato a última vigência/valor publicado em termos ativos."""
+    terms = [term for term in contract.terms if not term.excluded]
+    if not terms:
+        return
+    latest = max(terms, key=lambda term: (term.sequence, term.published_at or date.min))
+    if latest.start_date:
+        contract.start_date = latest.start_date
+    if latest.end_date:
+        contract.end_date = latest.end_date
+    if latest.global_amount is not None and latest.qualifies_amount:
+        contract.amount = latest.global_amount
+
+
+def upsert_contract_term(session: Session, contract: Contract, payload: dict) -> str:
+    """Importa um termo do PNCP e mantém a vigência efetiva do contrato."""
+    if not isinstance(payload, dict):
+        return "ignored"
+    sequence = parse_int(payload.get("sequencialTermoContrato"))
+    if sequence is None:
+        return "ignored"
+    raw = json.loads(json.dumps(payload, ensure_ascii=False, default=str))
+    digest = hashlib.sha256(json.dumps(raw, sort_keys=True, ensure_ascii=False).encode()).hexdigest()
+    key = f"{contract.pncp_key}#termo-{sequence}"
+    current = session.scalar(select(ContractTerm).where(ContractTerm.term_key == key))
+    if current and current.digest == digest:
+        current.last_seen_at = utcnow()
+        return "unchanged"
+    term_type = raw.get("tipoTermoContrato") or {}
+    fields = {
+        "contract_id": contract.id,
+        "sequence": sequence,
+        "number": str(raw.get("numeroTermoContrato") or "")[:70],
+        "type_id": parse_int(term_type.get("id") if isinstance(term_type, dict) else raw.get("tipoTermoContratoId")),
+        "type_name": str(term_type.get("nome") if isinstance(term_type, dict) else "")[:120],
+        "object": str(raw.get("objetoTermoContrato") or ""),
+        "signed_date": parse_date(raw.get("dataAssinatura")),
+        "start_date": parse_date(raw.get("dataVigenciaInicio")),
+        "end_date": parse_date(raw.get("dataVigenciaFim")),
+        "published_at": parse_date(raw.get("dataPublicacaoPncp")),
+        "amount_added": parse_amount(raw.get("valorAcrescido")),
+        "global_amount": parse_amount(raw.get("valorGlobal")),
+        "deadline_days": parse_int(raw.get("prazoAditadoDias")),
+        "qualifies_amount": bool(raw.get("qualificacaoAcrescimoSupressao")),
+        "qualifies_duration": bool(raw.get("qualificacaoVigencia")),
+        "excluded": bool(raw.get("excluido")),
+        "digest": digest,
+        "raw": raw,
+        "last_seen_at": utcnow(),
+    }
+    status = "updated" if current else "inserted"
+    if current is None:
+        current = ContractTerm(term_key=key, **fields)
+        session.add(current)
+    else:
+        for column, value in fields.items():
+            setattr(current, column, value)
+    session.flush()
+    if current not in contract.terms:
+        contract.terms.append(current)
+    refresh_contract_effective_fields(contract)
     return status
 
 
@@ -255,6 +357,7 @@ def auto_classify_contract_units(session: Session) -> int:
 
 
 def serialize_contract(c: Contract) -> dict:
+    terms = [serialize_contract_term(term) for term in c.terms if not term.excluded]
     return {
         "id": c.id, "pncp_key": c.pncp_key, "number": c.number,
         "year": c.year, "sequence": c.sequence, "buyer_cnpj": c.buyer_cnpj,
@@ -264,6 +367,29 @@ def serialize_contract(c: Contract) -> dict:
         "end_date": c.end_date.isoformat() if c.end_date else None,
         "secretary_id": c.secretary_id,
         "secretary": c.secretary.name if c.secretary else None,
+        "terms_count": len(terms),
+        "terms": terms,
+    }
+
+
+def serialize_contract_term(term: ContractTerm) -> dict:
+    return {
+        "id": term.id,
+        "contract_id": term.contract_id,
+        "kind": "termo",
+        "sequence": term.sequence,
+        "number": term.number,
+        "type_name": term.type_name or "Termo contratual",
+        "object": term.object,
+        "signed_date": term.signed_date.isoformat() if term.signed_date else None,
+        "start_date": term.start_date.isoformat() if term.start_date else None,
+        "end_date": term.end_date.isoformat() if term.end_date else None,
+        "published_at": term.published_at.isoformat() if term.published_at else None,
+        "amount_added": str(term.amount_added) if term.amount_added is not None else None,
+        "global_amount": str(term.global_amount) if term.global_amount is not None else None,
+        "deadline_days": term.deadline_days,
+        "qualifies_amount": term.qualifies_amount,
+        "qualifies_duration": term.qualifies_duration,
     }
 
 

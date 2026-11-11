@@ -8,7 +8,7 @@ Painel interno da Prefeitura de Turvo/PR para monitoramento de contratos publica
 
 Meta: implantar e homologar o sistema no Coolify **localhost**. Cada pedido de alteração deve ser registrado em `docs/PEDIDOS.md` e rastreado por commit, testes e atualização do `CHANGELOG.md`. Ver `docs/GOAL.md` e `AGENTS.md`.
 
-O painel inclui **calendário de vencimentos** por mês e secretaria, mostrando todos os contratos do dia com objeto, fornecedor, valor e situação. As áreas são sugeridas pela unidade oficial do contrato; gestores e e-mails não são inventados. Contratações do Compras.gov.br ficam em acervo separado e não são contadas como contratos.
+O painel inclui **calendário de vencimentos** por mês e secretaria, mostrando todos os contratos do dia com objeto, fornecedor, valor, situação e termos publicados. Aditivos, apostilamentos e rescisões ficam vinculados ao contrato original e podem atualizar sua vigência efetiva. As áreas são sugeridas pela unidade oficial do contrato; gestores e e-mails não são inventados. Contratações do Compras.gov.br ficam em acervo separado e não são contadas como contratos.
 
 ## Instalação Coolify
 

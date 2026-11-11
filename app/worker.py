@@ -14,12 +14,14 @@ from sqlalchemy.orm import Session, joinedload
 
 from .core import (
     AlertDelivery, Contract, SyncRun, SyncState,
-    SessionLocal, TARGET_CNPJ, auto_classify_contract_units, init_db, upsert_contract, upsert_procurement, utcnow,
+    SessionLocal, TARGET_CNPJ, auto_classify_contract_units, init_db, upsert_contract,
+    upsert_contract_term, upsert_procurement, utcnow,
 )
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 LOG = logging.getLogger("contratos")
 BASE = "https://pncp.gov.br/api/consulta/v1"
+TERMS_BASE = "https://pncp.gov.br/api/pncp/v1"
 COMPRAS_BASE = "https://dadosabertos.compras.gov.br"
 PAGE_SIZE = 100
 
@@ -116,6 +118,65 @@ def sync_updates():
     start = today - timedelta(days=14)
     sync_window("/contratos/atualizacao", start, today, "updates")
     sync_window("/contratos", today - timedelta(days=7), today, "recent-publication")
+
+
+def contract_terms(client: httpx.Client, contract: Contract) -> list[dict]:
+    if contract.year is None or contract.sequence is None:
+        return []
+    url = f"{TERMS_BASE}/orgaos/{TARGET_CNPJ}/contratos/{contract.year}/{contract.sequence}/termos"
+    for attempt in range(3):
+        try:
+            response = client.get(url)
+            if response.status_code in (204, 400, 404):
+                return []
+            if response.status_code in (429, 500, 502, 503, 504):
+                raise httpx.HTTPStatusError("PNCP de termos temporariamente indisponível", request=response.request, response=response)
+            response.raise_for_status()
+            body = response.json()
+            if not isinstance(body, list):
+                raise ValueError("Resposta inesperada do PNCP: termos não são uma lista")
+            return body
+        except (httpx.HTTPError, ValueError):
+            if attempt == 2:
+                raise
+            time.sleep(2 ** attempt)
+    return []
+
+
+def sync_terms():
+    """Atualiza termos de todos os contratos, inclusive aditivos publicados depois do contrato."""
+    with SessionLocal() as session:
+        run = SyncRun(kind="terms")
+        session.add(run)
+        session.commit()
+        processed = 0
+        errors = 0
+        try:
+            contracts = session.scalars(select(Contract).order_by(Contract.id)).all()
+            with httpx.Client(timeout=15, headers={"Accept": "application/json", "User-Agent": "ContratosTurvo/0.1"}) as client:
+                for contract in contracts:
+                    try:
+                        for item in contract_terms(client, contract):
+                            result = upsert_contract_term(session, contract, item)
+                            processed += int(result in ("inserted", "updated"))
+                        if contract.id % 25 == 0:
+                            session.commit()
+                    except Exception:
+                        errors += 1
+                        LOG.exception("Falha ao consultar termos do contrato %s", contract.pncp_key)
+            run.processed = processed
+            run.status = "error" if errors else "ok"
+            run.error = f"{errors} contrato(s) não consultado(s)" if errors else None
+            run.finished_at = utcnow()
+            session.commit()
+            LOG.info("termos: %d alterações, %d falhas", processed, errors)
+        except Exception as exc:
+            session.rollback()
+            run.status = "error"
+            run.finished_at = utcnow()
+            run.error = str(exc)[:800]
+            session.commit()
+            LOG.exception("Falha na sincronização de termos")
 
 
 def classify_existing_contracts():
@@ -264,6 +325,7 @@ def main():
             sync_publication()
             sync_updates()
             classify_existing_contracts()
+            sync_terms()
             sync_procurements()
             alerts()
         except Exception:
