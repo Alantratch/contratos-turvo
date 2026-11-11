@@ -2,6 +2,10 @@
 
 Cada pedido atendido gera registro em `docs/PEDIDOS.md`, alteração rastreável por commit e testes.
 
+## [0.2.1] — 2026-11-11
+- Sincronização PNCP tolerante a respostas HTTP 204 sem conteúdo.
+- Teste do adaptador para janelas sem contratos.
+
 ## [0.2.0] — 2026-11-11
 - Calendário mensal com contagem de vencimentos por dia, filtros por secretaria e abertura de contratos.
 - Filtro por data de vencimento exata e API agregada para calendário.

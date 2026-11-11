@@ -24,6 +24,7 @@ Executar dump PostgreSQL recorrente com retenção e cópia em outro host. Verif
 
 ## Falhas
 - PNCP 429 ou 5xx: coleta recua e tenta novamente, não remove contratos já importados.
+- PNCP 204: a janela não tem contratos; ela é concluída sem tentar ler JSON.
 - Falha de e-mail: não registra envio como concluído; tenta de novo no próximo ciclo.
 - Backend e worker rodam separados; falhas de API externa não interrompem visualização dos dados existentes.
 - Frontend sem domínio/Cloudflare: verificar configuração de roteamento do serviço `web` na porta 8000.

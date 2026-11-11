@@ -78,6 +78,14 @@ def test_pncp_adapter_pagination_and_cnpj_filter():
     assert batches[0][0]["numeroControlePNCP"] == payload["numeroControlePNCP"]
 
 
+def test_pncp_adapter_accepts_no_content():
+    import httpx
+    from app.worker import pages
+
+    with httpx.Client(transport=httpx.MockTransport(lambda request: httpx.Response(204))) as client:
+        assert list(pages(client, "/contratos", date(2026, 10, 1), date(2026, 10, 31))) == []
+
+
 def test_calendar_api_counts_dates_and_filters():
     from fastapi.testclient import TestClient
     from app.main import app
