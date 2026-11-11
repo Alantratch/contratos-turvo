@@ -134,6 +134,7 @@ def test_api_requires_auth_and_serves_dashboard():
         assert client.get("/", auth=auth).status_code == 200
         assert client.get("/api/summary", auth=auth).status_code == 200
         assert client.get("/assets/app.js", auth=auth).status_code == 200
+        assert client.get("/assets/vendor/bootstrap.min.css", auth=auth).status_code == 200
 
 
 def test_contract_search_matches_all_supplier_words():

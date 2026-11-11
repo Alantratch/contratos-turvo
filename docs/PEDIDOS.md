@@ -2,6 +2,18 @@
 
 Cada solicitação de alteração deve gerar entrada rastreável, commit(s), testes e status de implantação. Commits são o histórico imutável; este registro fornece contexto e critérios de aceite. Não gravar segredos.
 
+## CT-0010 — 2026-11-11 — Calendário em formato de agenda móvel
+
+**Pedido:** aproximar o calendário da agenda pública de licitações de Turvo, usar Bootstrap e melhorar a leitura no celular sem apresentar dados inconsistentes.
+
+**Implementação:** calendário reorganizado em cabeçalho mensal, navegação, caixa preta de alto contraste para filtros, contagens de todos/próximos/encerrados, prévias do objeto nos dias e painel completo do dia selecionado. Bootstrap 5.3.3 foi empacotado localmente, sem dependência de CDN em produção.
+
+**Consistência:** todos os contadores, filtros, células e detalhes derivam da mesma lista de itens retornada por `/api/calendar`; a API e as fontes PNCP/Compras.gov.br/Equiplano não foram duplicadas nem alteradas.
+
+**Aceite técnico:** JavaScript válido, teste do asset Bootstrap, suíte automatizada verde, Compose válido, deploy no Coolify e smoke test de saúde, autenticação, calendário e sincronização.
+
+**Status:** pronto para homologação.
+
 ## CT-0009 — 2026-11-11 — Priorizar contratos ativos
 
 **Pedido:** contratos encerrados não devem aparecer na frente da aba Contratos; contratos ativos precisam de maior visibilidade.

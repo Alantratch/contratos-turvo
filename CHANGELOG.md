@@ -1,5 +1,10 @@
 # Histórico de versões
 
+## [0.10.0] — 2026-11-11
+- Calendário refeito no formato de agenda mensal de Turvo, com prévias do objeto, navegação e painel de detalhes do dia.
+- Filtros de todos, próximos e encerrados calculados a partir dos mesmos itens da API, sem contagens independentes ou dados de exemplo.
+- Bootstrap 5.3.3 empacotado localmente e caixa preta de alto contraste adicionada para uso em celular; alertas de e-mail permanecem desligados.
+
 ## [0.9.0] — 2026-11-11
 - Aba de contratos passa a priorizar contratos ativos e não encerrados; registros encerrados continuam acessíveis, mas ficam no final da listagem.
 - Texto da aba esclarece a ordem de prioridade e teste automatizado cobre a ordenação ativa versus encerrada.
