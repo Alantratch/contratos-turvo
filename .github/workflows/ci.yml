@@ -35,3 +35,17 @@ jobs:
           done
           curl --fail --silent --show-error -u ci:ci-pass http://127.0.0.1:18181/api/summary
           docker rm -f contratos-turvo-smoke
+      - name: Testar stack Docker Compose com PostgreSQL real
+        run: |
+          docker compose --env-file .env.example up --build -d
+          for i in $(seq 1 50); do
+            if docker compose --env-file .env.example exec -T web python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/healthz', timeout=3)"; then
+              exit 0
+            fi
+            sleep 2
+          done
+          docker compose --env-file .env.example logs --tail=70
+          exit 1
+      - name: Encerrar stack de testes
+        if: always()
+        run: docker compose --env-file .env.example down -v --remove-orphans || true
