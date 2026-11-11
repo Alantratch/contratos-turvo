@@ -1,0 +1,59 @@
+services:
+  web:
+    build: .
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql+psycopg://contratos:${SERVICE_PASSWORD_64_DB}@db:5432/contratos
+      DASHBOARD_USERNAME: ${SERVICE_USER_ADMIN}
+      DASHBOARD_PASSWORD: ${SERVICE_PASSWORD_64_ADMIN}
+      TARGET_CNPJ: "78279973000107"
+      SERVICE_URL_WEB_8000: /
+    depends_on:
+      db:
+        condition: service_healthy
+    expose:
+      - "8000"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/healthz', timeout=3)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+
+  worker:
+    build: .
+    restart: unless-stopped
+    command: ["python", "-m", "app.worker"]
+    environment:
+      DATABASE_URL: postgresql+psycopg://contratos:${SERVICE_PASSWORD_64_DB}@db:5432/contratos
+      TARGET_CNPJ: "78279973000107"
+      SYNC_START_DATE: ${SYNC_START_DATE:-2021-01-01}
+      WORKER_INTERVAL_SECONDS: ${WORKER_INTERVAL_SECONDS:-3600}
+      PUBLICATION_WINDOWS_PER_CYCLE: ${PUBLICATION_WINDOWS_PER_CYCLE:-6}
+      ALERTS_ENABLED: ${ALERTS_ENABLED:-false}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      SMTP_FROM: ${SMTP_FROM:-}
+    depends_on:
+      db:
+        condition: service_healthy
+
+  db:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: contratos
+      POSTGRES_USER: contratos
+      POSTGRES_PASSWORD: ${SERVICE_PASSWORD_64_DB}
+    volumes:
+      - contratos_postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U contratos -d contratos"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  contratos_postgres:
