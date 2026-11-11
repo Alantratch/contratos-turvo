@@ -48,3 +48,15 @@ def test_dates_and_alert_levels():
     assert alert_threshold(30) == 30
     assert alert_threshold(8) == 15
     assert alert_threshold(-1) is None
+
+
+def test_api_requires_auth_and_serves_dashboard():
+    from fastapi.testclient import TestClient
+    from app.main import app
+    with TestClient(app) as client:
+        assert client.get("/healthz").status_code == 200
+        assert client.get("/").status_code == 401
+        auth = ("test", "test-password")
+        assert client.get("/", auth=auth).status_code == 200
+        assert client.get("/api/summary", auth=auth).status_code == 200
+        assert client.get("/assets/app.js", auth=auth).status_code == 200

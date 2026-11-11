@@ -7,6 +7,7 @@ import os
 from contextlib import asynccontextmanager
 from datetime import date, timedelta
 from pathlib import Path
+from urllib.parse import urlparse
 
 from fastapi import Depends, FastAPI, HTTPException, Query, Request
 from fastapi.responses import FileResponse, JSONResponse, Response
@@ -51,11 +52,17 @@ async def require_auth(request: Request, call_next):
 
     if request.method not in ("GET", "HEAD", "OPTIONS"):
         origin = request.headers.get("origin")
-        if origin and origin != str(request.base_url).rstrip("/"):
+        if origin and urlparse(origin).netloc.lower() != request.headers.get("host", "").lower():
             return JSONResponse({"detail": "Origem não autorizada"}, status_code=403)
         if request.headers.get("content-type", "").split(";")[0] != "application/json":
             return JSONResponse({"detail": "Content-Type deve ser application/json"}, status_code=415)
-    return await call_next(request)
+    response = await call_next(request)
+    response.headers["Cache-Control"] = "no-store"
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["Referrer-Policy"] = "no-referrer"
+    response.headers["Content-Security-Policy"] = "default-src 'self'; img-src 'self' data:; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'"
+    return response
 
 
 def db():

@@ -17,4 +17,6 @@ jobs:
           python-version: "3.12"
       - run: pip install -r requirements-dev.txt
       - run: python -m compileall -q app
-      - run: pytest -q
+      - run: python -m pytest -q
+      - run: node --check app/static/app.js
+      - run: docker compose --env-file .env.example config --quiet
