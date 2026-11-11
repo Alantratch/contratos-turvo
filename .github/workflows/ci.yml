@@ -20,3 +20,18 @@ jobs:
       - run: python -m pytest -q
       - run: node --check app/static/app.js
       - run: docker compose --env-file .env.example config --quiet
+      - name: Construir imagem Docker
+        run: docker build -t contratos-turvo:test .
+      - name: Testar container HTTP com SQLite isolado
+        run: |
+          docker run -d --name contratos-turvo-smoke \
+            -e DATABASE_URL=sqlite:////tmp/contratos-ci.sqlite3 \
+            -e DASHBOARD_USERNAME=ci \
+            -e DASHBOARD_PASSWORD=ci-pass \
+            -p 127.0.0.1:18181:8000 contratos-turvo:test
+          for i in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:18181/healthz; then break; fi
+            sleep 1
+          done
+          curl --fail --silent --show-error -u ci:ci-pass http://127.0.0.1:18181/api/summary
+          docker rm -f contratos-turvo-smoke

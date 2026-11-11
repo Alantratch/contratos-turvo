@@ -60,3 +60,19 @@ def test_api_requires_auth_and_serves_dashboard():
         assert client.get("/", auth=auth).status_code == 200
         assert client.get("/api/summary", auth=auth).status_code == 200
         assert client.get("/assets/app.js", auth=auth).status_code == 200
+
+
+def test_pncp_adapter_pagination_and_cnpj_filter():
+    import httpx
+    from app.worker import pages
+    payload = sample()
+
+    def fake_server(request):
+        assert request.url.params["cnpjOrgao"] == "78279973000107"
+        assert request.url.params["pagina"] == "1"
+        return httpx.Response(200, json={"data": [payload], "totalPaginas": 1})
+
+    with httpx.Client(transport=httpx.MockTransport(fake_server)) as client:
+        batches = list(pages(client, "/contratos", date(2026, 10, 1), date(2026, 10, 31)))
+    assert len(batches) == 1
+    assert batches[0][0]["numeroControlePNCP"] == payload["numeroControlePNCP"]
