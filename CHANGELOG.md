@@ -1,5 +1,10 @@
 # Histórico de versões
 
+## [0.6.0] — 2026-11-11
+- Integração do Portal de Transparência/Equiplano, que contém contratos e aditivos não publicados no PNCP.
+- Backfill desde 2021, com vigência, objeto, fornecedor e aditivos vinculados ao contrato-base.
+- Alertas de e-mail continuam desabilitados por padrão.
+
 ## [0.5.0] — 2026-11-11
 - Sincronização dos termos de cada contrato pelo endpoint oficial do PNCP, incluindo aditivos, apostilamentos e rescisões publicados.
 - Aditivos ficam vinculados ao contrato original, aparecem na busca/calendário e atualizam a vigência efetiva quando o termo informa prorrogação.

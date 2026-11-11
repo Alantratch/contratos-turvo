@@ -57,3 +57,13 @@ Cada solicitação de alteração deve gerar entrada rastreável, commit(s), tes
 **Limitação de classificação:** o PNCP só permite classificar automaticamente quando publica uma unidade específica. Quando a unidade é apenas PREFEITURA MUNICIPAL DE TURVO - PR, o sistema não inventa secretaria, gestor ou e-mail e mantém o contrato pendente de revisão.
 
 **Aceite técnico:** 12 testes automatizados verdes, adaptador tolerante a HTTP 204, backfill configurado desde 2021 e alertas de e-mail desligados.
+
+## CT-0006 — 2026-11-11 — Completar contratos fora do PNCP
+
+**Pedido:** corrigir a ausência dos contratos Vieira e Retecheski e IDS Software, inclusive quando possuem vencimento próximo e aditivos publicados no portal municipal.
+
+**Implementação:** o worker consulta o relatório público de contratos do Portal de Transparência/Equiplano desde 2021, importa contratos e linhas de aditivo, vincula os aditivos ao contrato-base e deixa a vigência efetiva disponível para a tabela e o calendário. O PNCP e o Compras.gov.br continuam preservados como fontes separadas.
+
+**Limitação conhecida:** o certificado público do Equiplano entrega cadeia incompleta no momento; `EQUIPLANO_VERIFY_TLS=false` é explícito e deve voltar a `true` quando o provedor corrigir a cadeia. A origem é pública e não recebe credenciais.
+
+**Aceite técnico:** backfill temporário validado com parser real, 13 testes automatizados verdes, alertas de e-mail desligados e nenhum serviço/banco existente removido.

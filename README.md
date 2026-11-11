@@ -1,6 +1,6 @@
 # Contratos Turvo
 
-Painel interno da Prefeitura de Turvo/PR para monitoramento de contratos publicados no PNCP e contratações publicadas no Compras.gov.br, com histórico importado, atualização incremental, classificação por secretaria e alertas de vigência.
+Painel interno da Prefeitura de Turvo/PR para monitoramento de contratos publicados no PNCP, contratos do Portal de Transparência/Equiplano e contratações publicadas no Compras.gov.br, com histórico importado, atualização incremental, classificação por secretaria e alertas de vigência.
 
 **Estado:** MVP funcional sujeito a homologação de dados, destinatários, autenticação e deploy. O sistema não substitui a validação de contratos/aditivos pela área responsável.
 
@@ -31,6 +31,8 @@ docker compose logs -f worker
 ```
 
 O primeiro carregamento histórico avança por janelas de 30 dias desde `SYNC_START_DATE`. Futuras execuções verificam as atualizações e preservam versões brutas quando os registros mudam. Nenhum contrato é apagado quando o PNCP falha.
+
+O worker também consulta os contratos e aditivos do Portal de Transparência/Equiplano desde `EQUIPLANO_START_YEAR` (2021 por padrão). O portal público de Turvo atualmente entrega uma cadeia TLS incompleta; por isso `EQUIPLANO_VERIFY_TLS=false` permanece explícito até a correção do provedor. Essa consulta não recebe credenciais.
 
 ### Documentação
 - `docs/OPERACAO.md`: validação, deploy, alertas e recuperação.
