@@ -29,9 +29,9 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px s
 
 .app-shell { display: flex; min-height: 100vh; }
 .sidebar { position: sticky; top: 0; display: flex; flex-direction: column; width: 248px; min-height: 100vh; padding: 22px 14px 18px; flex: 0 0 248px; border-right: 1px solid var(--border); background: #fff; }
-.brand-block { padding: 4px 12px 30px; }
-.brand-logo { display: block; width: 190px; max-height: 74px; height: auto; object-fit: contain; object-position: left center; filter: brightness(0); }
-.brand-caption { display: block; margin-top: 12px; color: var(--muted); font-size: 11px; letter-spacing: .08em; text-transform: uppercase; }
+.brand-block { padding: 4px 12px 26px; text-align: center; }
+.brand-logo { display: block; width: 128px; height: 168px; margin: 0 auto; object-fit: contain; object-position: center; }
+.brand-caption { display: block; margin-top: 8px; color: var(--muted); font-size: 11px; letter-spacing: .08em; text-transform: uppercase; }
 .sidebar-label, .overline, .data-label { color: var(--muted); font-size: 10px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; }
 .sidebar-label { margin: 0 12px 8px; color: var(--subtle); }
 .nav { display: grid; gap: 3px; }
