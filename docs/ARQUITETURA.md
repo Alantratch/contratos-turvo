@@ -19,6 +19,7 @@
 - `sync_runs`: auditoria de cada janela e erros (sem descartar dados anteriores).
 - `alert_deliveries`: previne duplicação por contrato + régua + vigência + destinatário.
 - `audit_events`: criação de secretaria e associação manual.
+- Classificação automática: unidades específicas do PNCP viram áreas sem e-mail e recebem os contratos ainda não classificados; a unidade genérica da Prefeitura permanece pendente de revisão.
 
 ## API do painel (autenticada)
 - `GET /api/summary`: totais e próximos vencimentos;

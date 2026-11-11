@@ -233,6 +233,27 @@ def upsert_procurement(session: Session, payload: dict) -> str:
     return status
 
 
+def auto_classify_contract_units(session: Session) -> int:
+    """Cria áreas a partir da unidade oficial e não tenta adivinhar gestor ou e-mail."""
+    generic_units = {"PREFEITURA MUNICIPAL DE TURVO - PR"}
+    areas = {row.name: row for row in session.scalars(select(Secretary)).all()}
+    changed = 0
+    contracts = session.scalars(select(Contract).where(Contract.secretary_id.is_(None), Contract.unit != "")).all()
+    for contract in contracts:
+        name = contract.unit.strip()
+        if not name or name in generic_units:
+            continue
+        area = areas.get(name)
+        if area is None:
+            area = Secretary(name=name[:160])
+            session.add(area)
+            session.flush()
+            areas[name] = area
+        contract.secretary_id = area.id
+        changed += 1
+    return changed
+
+
 def serialize_contract(c: Contract) -> dict:
     return {
         "id": c.id, "pncp_key": c.pncp_key, "number": c.number,
