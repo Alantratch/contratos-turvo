@@ -7,7 +7,6 @@ services:
       DASHBOARD_USERNAME: ${SERVICE_USER_ADMIN}
       DASHBOARD_PASSWORD: ${SERVICE_PASSWORD_64_ADMIN}
       TARGET_CNPJ: "78279973000107"
-      SERVICE_URL_WEB_8000: /
     depends_on:
       db:
         condition: service_healthy
