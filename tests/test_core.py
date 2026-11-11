@@ -1,5 +1,9 @@
 from datetime import date
-from app.core import Base, Contract, ContractRevision, Procurement, Secretary, SessionLocal, auto_classify_contract_units, engine, parse_date, upsert_contract, upsert_procurement
+from app.core import (
+    Base, Contract, ContractRevision, ContractTerm, Procurement, Secretary, SessionLocal,
+    auto_classify_contract_units, engine, parse_date, serialize_contract, upsert_contract,
+    upsert_contract_term, upsert_procurement,
+)
 from app.worker import alert_threshold
 from sqlalchemy import select
 
@@ -32,6 +36,36 @@ def test_upsert_idempotent_and_versions():
         db.commit()
         assert len(db.scalars(select(Contract)).all()) == 1
         assert len(db.scalars(select(ContractRevision)).all()) == 2
+
+
+def test_contract_terms_are_stored_and_update_effective_vigency():
+    Base.metadata.create_all(engine)
+    with SessionLocal() as db:
+        payload = sample()
+        upsert_contract(db, payload)
+        contract = db.scalar(select(Contract).where(Contract.pncp_key == payload["numeroControlePNCP"]))
+        term = {
+            "sequencialTermoContrato": 1,
+            "numeroTermoContrato": "1",
+            "tipoTermoContrato": {"id": 2, "nome": "Termo aditivo"},
+            "objetoTermoContrato": "Prorrogação da vigência",
+            "dataAssinatura": "2026-12-01",
+            "dataVigenciaInicio": "2026-01-01",
+            "dataVigenciaFim": "2027-06-30",
+            "dataPublicacaoPncp": "2026-12-02T10:00:00",
+            "valorAcrescido": 50,
+            "valorGlobal": 150.25,
+            "prazoAditadoDias": 181,
+            "qualificacaoAcrescimoSupressao": True,
+            "qualificacaoVigencia": True,
+        }
+        assert upsert_contract_term(db, contract, term) == "inserted"
+        db.commit()
+        stored = db.scalar(select(Contract).where(Contract.id == contract.id))
+        assert stored.end_date == date(2027, 6, 30)
+        assert stored.amount == 150.25
+        assert len(db.scalars(select(ContractTerm)).all()) == 1
+        assert serialize_contract(stored)["terms_count"] == 1
 
 
 def test_other_municipality_is_ignored():
@@ -124,6 +158,15 @@ def test_pncp_adapter_accepts_no_content():
 
     with httpx.Client(transport=httpx.MockTransport(lambda request: httpx.Response(204))) as client:
         assert list(pages(client, "/contratos", date(2026, 10, 1), date(2026, 10, 31))) == []
+
+
+def test_pncp_terms_adapter_accepts_no_content():
+    import httpx
+    from app.worker import contract_terms
+
+    contract = Contract(year=2026, sequence=1, pncp_key="78279973000107-2-00001/2026")
+    with httpx.Client(transport=httpx.MockTransport(lambda request: httpx.Response(204))) as client:
+        assert contract_terms(client, contract) == []
 
 
 def test_calendar_api_counts_dates_and_filters():

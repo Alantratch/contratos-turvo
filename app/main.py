@@ -14,9 +14,10 @@ from fastapi.responses import FileResponse, JSONResponse, Response
 from pydantic import BaseModel, Field
 from sqlalchemy import func, or_, select, text
 from sqlalchemy.orm import Session, joinedload
+from sqlalchemy.orm import selectinload
 
 from .core import (
-    AuditEvent, Contract, Procurement, Secretary, SyncRun, SyncState,
+    AuditEvent, Contract, ContractTerm, Procurement, Secretary, SyncRun, SyncState,
     SessionLocal, init_db, serialize_contract, serialize_procurement
 )
 
@@ -101,6 +102,7 @@ def summary(session: Session = Depends(db)):
     expired = session.scalar(select(func.count()).select_from(Contract).where(Contract.end_date < today)) or 0
     unclassified = session.scalar(select(func.count()).select_from(Contract).where(Contract.secretary_id.is_(None))) or 0
     procurements = session.scalar(select(func.count()).select_from(Procurement)) or 0
+    terms = session.scalar(select(func.count()).select_from(ContractTerm).where(ContractTerm.excluded.is_(False))) or 0
     groups = session.execute(
         select(Secretary.name, func.count(Contract.id))
         .join(Contract, Contract.secretary_id == Secretary.id)
@@ -112,7 +114,7 @@ def summary(session: Session = Depends(db)):
     return {
         "all": all_contracts, "active": active, "upcoming": upcoming,
         "expired": expired, "unclassified": unclassified,
-        "procurements": procurements,
+        "procurements": procurements, "terms": terms,
         "by_secretary": [{"name": n, "count": count} for n, count in groups],
         "sync": {
             "status": latest.status,
@@ -136,7 +138,11 @@ def contracts(
     stmt = select(Contract)
     if q.strip():
         term = "%" + q.strip() + "%"
-        stmt = stmt.where(or_(Contract.number.ilike(term), Contract.supplier.ilike(term), Contract.object.ilike(term)))
+        stmt = stmt.where(or_(
+            Contract.number.ilike(term), Contract.supplier.ilike(term), Contract.object.ilike(term),
+            Contract.terms.any(ContractTerm.number.ilike(term)),
+            Contract.terms.any(ContractTerm.object.ilike(term)),
+        ))
     if secretary_id is not None:
         stmt = stmt.where(Contract.secretary_id == secretary_id)
     if due_date is not None:
@@ -149,7 +155,7 @@ def contracts(
         stmt = stmt.where(Contract.end_date.is_(None))
     total = session.scalar(select(func.count()).select_from(stmt.subquery())) or 0
     result = session.scalars(
-        stmt.options(joinedload(Contract.secretary))
+        stmt.options(joinedload(Contract.secretary), selectinload(Contract.terms))
         .order_by(Contract.end_date.is_(None), Contract.end_date, Contract.id)
         .offset((page - 1) * limit).limit(limit)
     ).all()
@@ -169,7 +175,7 @@ def calendar(
         raise HTTPException(422, "Mês fora do intervalo permitido")
     first_day = date(year, month_number, 1)
     next_month = date(year + 1, 1, 1) if month_number == 12 else date(year, month_number + 1, 1)
-    stmt = select(Contract).options(joinedload(Contract.secretary)).where(
+    stmt = select(Contract).options(joinedload(Contract.secretary), selectinload(Contract.terms)).where(
         Contract.end_date >= first_day, Contract.end_date < next_month
     )
     if secretary_id is not None:

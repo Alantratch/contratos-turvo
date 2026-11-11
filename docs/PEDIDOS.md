@@ -47,3 +47,13 @@ Cada solicitação de alteração deve gerar entrada rastreável, commit(s), tes
 **Aceite técnico:** JavaScript válido, testes automatizados verdes, configuração Compose válida, deploy sem alteração de volumes/serviços e smoke test de saúde, autenticação e assets.
 
 **Status:** pronto para homologação visual e funcional em produção; alertas de e-mail continuam desligados.
+
+## CT-0005 — 2026-11-11 — Histórico de termos e aditivos
+
+**Pedido:** importar todos os contratos de pelo menos cinco anos atrás até hoje e também os aditivos/termos publicados depois do contrato original.
+
+**Implementação:** o worker consulta o endpoint oficial de termos por contrato, persiste cada termo vinculado ao contrato PNCP, exibe os aditivos na listagem e no calendário e aplica a última vigência publicada como vigência efetiva, preservando o JSON original e o contrato-base.
+
+**Limitação de classificação:** o PNCP só permite classificar automaticamente quando publica uma unidade específica. Quando a unidade é apenas PREFEITURA MUNICIPAL DE TURVO - PR, o sistema não inventa secretaria, gestor ou e-mail e mantém o contrato pendente de revisão.
+
+**Aceite técnico:** 12 testes automatizados verdes, adaptador tolerante a HTTP 204, backfill configurado desde 2021 e alertas de e-mail desligados.
