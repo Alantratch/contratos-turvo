@@ -1,5 +1,5 @@
 from datetime import date
-from app.core import Base, Contract, ContractRevision, Procurement, SessionLocal, engine, parse_date, upsert_contract, upsert_procurement
+from app.core import Base, Contract, ContractRevision, Procurement, Secretary, SessionLocal, auto_classify_contract_units, engine, parse_date, upsert_contract, upsert_procurement
 from app.worker import alert_threshold
 from sqlalchemy import select
 
@@ -60,6 +60,25 @@ def test_compras_procurement_is_stored_separately():
         assert upsert_procurement(db, payload) == "inserted"
         db.commit()
         assert db.scalar(select(Procurement).where(Procurement.source_key == payload["numeroControlePNCP"])) is not None
+
+
+def test_units_create_areas_but_skip_generic_municipality():
+    Base.metadata.create_all(engine)
+    with SessionLocal() as db:
+        specific = sample()
+        specific["numeroControlePNCP"] = "78279973000107-2-00003/2026"
+        specific["unidadeOrgao"] = {"nomeUnidade": "SECRETARIA DE SAUDE"}
+        generic = sample()
+        generic["numeroControlePNCP"] = "78279973000107-2-00004/2026"
+        generic["unidadeOrgao"] = {"nomeUnidade": "PREFEITURA MUNICIPAL DE TURVO - PR"}
+        upsert_contract(db, specific)
+        upsert_contract(db, generic)
+        assert auto_classify_contract_units(db) >= 1
+        db.commit()
+        area = db.scalar(select(Secretary).where(Secretary.name == "SECRETARIA DE SAUDE"))
+        assert area is not None
+        assert db.scalar(select(Contract).where(Contract.pncp_key == specific["numeroControlePNCP"])).secretary_id == area.id
+        assert db.scalar(select(Contract).where(Contract.pncp_key == generic["numeroControlePNCP"])).secretary_id is None
 
 
 def test_dates_and_alert_levels():

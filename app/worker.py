@@ -14,7 +14,7 @@ from sqlalchemy.orm import Session, joinedload
 
 from .core import (
     AlertDelivery, Contract, SyncRun, SyncState,
-    SessionLocal, TARGET_CNPJ, init_db, upsert_contract, upsert_procurement, utcnow,
+    SessionLocal, TARGET_CNPJ, auto_classify_contract_units, init_db, upsert_contract, upsert_procurement, utcnow,
 )
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
@@ -69,6 +69,7 @@ def sync_window(endpoint: str, start: date, end: date, kind: str):
                     for item in batch:
                         result = upsert_contract(session, item)
                         processed += int(result in ("inserted", "updated"))
+                    auto_classify_contract_units(session)
                     session.commit()
             run.processed = processed
             run.status = "ok"
@@ -115,6 +116,14 @@ def sync_updates():
     start = today - timedelta(days=14)
     sync_window("/contratos/atualizacao", start, today, "updates")
     sync_window("/contratos", today - timedelta(days=7), today, "recent-publication")
+
+
+def classify_existing_contracts():
+    with SessionLocal() as session:
+        changed = auto_classify_contract_units(session)
+        session.commit()
+        if changed:
+            LOG.info("classificação automática por unidade: %d contratos", changed)
 
 
 def compras_pages(client: httpx.Client, modality: int, begin: date, end: date):
@@ -254,6 +263,7 @@ def main():
         try:
             sync_publication()
             sync_updates()
+            classify_existing_contracts()
             sync_procurements()
             alerts()
         except Exception:

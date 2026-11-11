@@ -6,6 +6,7 @@ Cada pedido atendido gera registro em `docs/PEDIDOS.md`, alteração rastreável
 - Contratações do Compras.gov.br importadas em acervo separado de contratos.
 - Calendário retorna e exibe todos os contratos do dia com objeto, fornecedor e valor.
 - Brasão oficial do Turvo aplicado à identificação do painel.
+- Áreas responsáveis sugeridas automaticamente pela unidade oficial do contrato, sem inventar gestores ou e-mails.
 
 ## [0.2.1] — 2026-11-11
 - Sincronização PNCP tolerante a respostas HTTP 204 sem conteúdo.
