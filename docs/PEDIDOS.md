@@ -2,6 +2,18 @@
 
 Cada solicitação de alteração deve gerar entrada rastreável, commit(s), testes e status de implantação. Commits são o histórico imutável; este registro fornece contexto e critérios de aceite. Não gravar segredos.
 
+## CT-0008 — 2026-11-11 — Logo vertical colorida
+
+**Pedido:** trocar a logo horizontal pela versão vertical colorida do Turvo.
+
+**Implementação:** substituído o asset por `Logo Turvo.png` do Drive e ajustado o enquadramento da marca na sidebar; removido o filtro monocromático aplicado à versão anterior.
+
+**Escopo preservado:** nenhuma rota, API, regra de importação, dado, autenticação, volume ou serviço foi alterado.
+
+**Aceite técnico:** asset PNG válido, JavaScript preservado, teste de saúde e validação visual da sidebar publicada.
+
+**Status:** pronto para homologação.
+
 ## CT-0007 — 2026-11-11 — Linguagem visual shadcn/ui
 
 **Pedido:** refatorar os designs para uma interface moderna e estilizada, removendo a aparência genérica de IA.

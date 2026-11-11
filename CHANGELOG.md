@@ -1,5 +1,8 @@
 # Histórico de versões
 
+## [0.8.0] — 2026-11-11
+- Logo institucional substituída pela versão vertical colorida do Turvo, com enquadramento próprio para a sidebar clara.
+
 ## [0.7.0] — 2026-11-11
 - Refatoração visual completa da camada administrativa com primitives inspirados no shadcn/ui: superfícies neutras, bordas sutis, controles compactos, estados semânticos e navegação com ícones SVG acessíveis.
 - Calendário, tabelas, filtros, indicadores e estados de sincronização receberam a mesma linguagem visual responsiva, sem alterar rotas, dados, autenticação ou alertas.
