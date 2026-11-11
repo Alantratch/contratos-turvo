@@ -341,3 +341,69 @@ td small { display: block; margin-top: 3px; color: var(--muted); font-size: 11px
   .procurement-event-chip b { margin: 0; font-size: 9px; }
   .procurement-phase { white-space: normal; }
 }
+
+.licitacao-module-layout { display: grid; gap: 14px; }
+.licitacao-calendar-card { padding: 17px; }
+.licitacao-calendar-card .calendar-day { position: relative; }
+.licitacao-calendar-card .day-button { display: flex; width: 100%; min-height: 24px; padding: 0; border: 0; background: transparent; color: inherit; text-align: left; cursor: pointer; }
+.licitacao-calendar-card .day-button:focus-visible, .licitacao-catalog-row:focus-visible, .procurement-event-chip:focus-visible { outline: 2px solid #2563eb; outline-offset: -2px; }
+.licitacao-calendar-card .calendar-day.is-selected { box-shadow: inset 0 0 0 2px var(--primary); }
+.procurement-event-chip { width: 100%; border-top: 0; border-right: 0; border-bottom: 0; cursor: pointer; font: inherit; text-align: left; }
+.procurement-event-chip:hover { filter: brightness(.97); transform: translateY(-1px); }
+.procurement-event-chip.is-today { border-color: #7c3aed; background: #f5f3ff; color: #5b21b6; }
+.procurement-event-chip.is-in_progress { border-color: #0891b2; background: #ecfeff; color: #155e75; }
+.procurement-event-chip.is-pending { border-color: #d97706; background: #fffbeb; color: #92400e; }
+.procurement-event-chip.is-contracted { border-color: #047857; background: #ecfdf5; color: #065f46; }
+.procurement-event-chip.is-revoked { border-color: #71717a; background: #f4f4f5; color: #3f3f46; }
+.procurement-event-chip.is-suspended { border-color: #ea580c; background: #fff7ed; color: #9a3412; }
+.procurement-phase.is-today { background: #f5f3ff; color: #6d28d9; }
+.procurement-phase.is-in_progress { background: #ecfeff; color: #0e7490; }
+.procurement-phase.is-pending { background: var(--amber-soft); color: var(--amber); }
+.procurement-phase.is-contracted { background: #ecfdf5; color: #047857; }
+.procurement-phase.is-revoked { background: #f4f4f5; color: #52525b; }
+.procurement-phase.is-suspended { background: #fff7ed; color: #c2410c; }
+.licitacao-legend { display: flex; flex-wrap: wrap; gap: 8px 16px; margin-top: 14px; color: var(--muted); font-size: 10px; }
+.legend-swatch { display: inline-block; width: 8px; height: 8px; margin-right: 4px; border-radius: 50%; background: #2563eb; }
+.legend-swatch.is-progress { background: #0891b2; }
+.legend-swatch.is-pending { background: #d97706; }
+.legend-swatch.is-result { background: #047857; }
+.legend-swatch.is-cancelled { background: #ea580c; }
+.licitacao-catalog-card { padding: 0; overflow: hidden; }
+.licitacao-catalog-card .card-heading { margin: 0; padding: 19px 19px 16px; }
+.licitacao-catalog-card .filter-bar { padding-top: 0; }
+.licitacao-catalog-scroll { max-height: 680px; overflow: auto; }
+.licitacao-catalog-row { cursor: pointer; }
+.licitacao-catalog-row:hover td { background: #fafafa; }
+.licitacao-catalog-object { display: -webkit-box; max-width: 520px; overflow: hidden; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-height: 1.4; }
+
+.modal-backdrop { position: fixed; z-index: 30; inset: 0; display: grid; place-items: center; padding: 18px; background: rgba(24, 24, 27, .62); }
+.modal-backdrop[hidden] { display: none; }
+.modal-open { overflow: hidden; }
+.modal-card { width: min(100%, 760px); max-height: min(820px, calc(100vh - 36px)); overflow: auto; border: 1px solid var(--border-strong); border-radius: 12px; background: #fff; box-shadow: 0 24px 70px rgba(24, 24, 27, .24); }
+.modal-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; padding: 21px 22px 17px; border-bottom: 1px solid var(--border); }
+.modal-header h2 { margin: 5px 0; color: var(--foreground); font-size: 21px; letter-spacing: -.03em; }
+.modal-header-actions { display: flex; align-items: center; gap: 12px; }
+.modal-body { display: grid; gap: 18px; padding: 22px; }
+.licitacao-modal-object { padding: 14px; border: 1px solid var(--border); border-radius: 8px; background: #fafafa; }
+.licitacao-modal-object p { margin: 7px 0 0; color: #3f3f46; font-size: 14px; line-height: 1.55; }
+.modal-label { display: block; color: var(--muted); font-size: 10px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; }
+.licitacao-detail-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.licitacao-detail-grid > div { display: grid; gap: 5px; min-width: 0; padding: 11px; border: 1px solid var(--border); border-radius: 8px; }
+.licitacao-detail-grid strong { color: var(--foreground); font-size: 12px; line-height: 1.35; }
+.modal-section { display: grid; gap: 9px; padding-top: 16px; border-top: 1px solid var(--border); }
+.modal-contract-list { display: grid; gap: 7px; }
+.modal-contract { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; padding: 9px 11px; border: 1px solid #bbf7d0; border-radius: 8px; background: var(--green-soft); color: #166534; font-size: 11px; }
+.modal-contract span { color: #3f3f46; text-align: right; }
+.modal-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.modal-actions .button { min-height: 34px; }
+.modal-note { color: var(--muted); font-size: 11px; line-height: 1.45; }
+
+@media (max-width: 560px) {
+  .licitacao-calendar-card { padding: 10px; }
+  .licitacao-detail-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .modal-backdrop { padding: 8px; }
+  .modal-header, .modal-body { padding: 16px; }
+  .modal-header h2 { font-size: 18px; }
+  .modal-contract { align-items: flex-start; flex-direction: column; gap: 3px; }
+  .modal-contract span { text-align: left; }
+}

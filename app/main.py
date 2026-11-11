@@ -228,37 +228,48 @@ def linked_contracts(session: Session, procurement_keys: list[str]) -> dict[str,
 
 @app.get("/api/licitacoes")
 def licitacoes(
-    month: str = Query(..., pattern=r"^\d{4}-(0[1-9]|1[0-2])$"),
+    month: str | None = Query(None, pattern=r"^\d{4}-(0[1-9]|1[0-2])$"),
+    year: int | None = Query(None, ge=2021, le=2100),
     session: Session = Depends(db),
 ):
-    """Agenda mensal de licitações pela data oficial de abertura de propostas."""
-    year, month_number = map(int, month.split("-"))
-    if year < 2021 or year > 2100:
-        raise HTTPException(422, "Mês fora do intervalo permitido")
-    first_day = date(year, month_number, 1)
-    next_month = date(year + 1, 1, 1) if month_number == 12 else date(year, month_number + 1, 1)
-    rows = session.scalars(
-        select(Procurement).where(
+    """Agenda e catálogo anual pelas datas oficiais do Compras.gov.br."""
+    if month:
+        month_year, month_number = map(int, month.split("-"))
+        if year is not None and year != month_year:
+            raise HTTPException(422, "Ano e mês não correspondem")
+        year = month_year
+        first_day = date(year, month_number, 1)
+        next_month = date(year + 1, 1, 1) if month_number == 12 else date(year, month_number + 1, 1)
+        stmt = select(Procurement).where(
             Procurement.opening_date >= first_day, Procurement.opening_date < next_month
-        ).order_by(Procurement.opening_date, Procurement.id)
-    ).all()
+        )
+    else:
+        year = year or date.today().year
+        stmt = select(Procurement).where(Procurement.year == year)
+    rows = session.scalars(stmt.order_by(Procurement.opening_date, Procurement.id)).all()
     linked = linked_contracts(session, [row.source_key for row in rows])
     items = [serialize_procurement(row, linked.get(row.source_key, [])) for row in rows]
     grouped: dict[str, list[dict]] = {}
     for item in items:
-        grouped.setdefault(item["opening_date"], []).append(item)
+        if item["opening_date"]:
+            grouped.setdefault(item["opening_date"], []).append(item)
     summary = {
         "all": len(items),
         "scheduled": sum(item["phase"] in {"scheduled", "today"} for item in items),
-        "held": sum(item["phase"] == "held" for item in items),
-        "result": sum(item["result_exists"] for item in items),
+        "in_progress": sum(item["phase"] == "in_progress" for item in items),
+        "pending": sum(item["phase"] == "pending" for item in items),
+        "result": sum(item["phase"] in {"result", "contracted"} for item in items),
+        "contracted": sum(item["phase"] == "contracted" for item in items),
         "cancelled": sum(item["phase"] in {"cancelled", "revoked", "suspended"} for item in items),
         "contracts": sum(bool(item["contracts"]) for item in items),
+        "undated": sum(not item["opening_date"] for item in items),
     }
     return {
+        "year": year,
         "month": month,
         "total": len(items),
         "summary": summary,
+        "items": items,
         "days": [{"date": day, "count": len(day_items), "items": day_items} for day, day_items in grouped.items()],
     }
 

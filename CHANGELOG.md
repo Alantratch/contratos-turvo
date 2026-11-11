@@ -1,5 +1,11 @@
 # Histórico de versões
 
+## [0.12.0] — 2026-11-11
+- Catálogo anual de licitações pela rota `GET /api/licitacoes?year=YYYY`, preservando registros sem data de abertura.
+- Clique em evento ou linha do catálogo abre modal com objeto, datas, valores, situação, contrato e links oficiais.
+- Classificação revisada por cores: próxima, em andamento, aguardando resultado, resultado/contrato e anulada/suspensa.
+- “Aguardando resultado” só é aplicado após o encerramento da janela de propostas; alertas continuam desligados.
+
 ## [0.11.0] — 2026-11-11
 - Novo módulo “Agenda de licitações”, separado do acervo de contratos.
 - Calendário por abertura de propostas com filtros de próximas, realizadas, resultado publicado e anuladas/suspensas.

@@ -30,7 +30,8 @@
 - `GET /api/summary`: totais e próximos vencimentos;
 - `GET /api/contracts?q=&page=&limit=&period=&secretary_id=`: busca paginada;
 - `GET /api/procurements?q=&page=&limit=`: busca as contratações publicadas no Compras.gov.br;
-- `GET /api/licitacoes?month=YYYY-MM`: agenda mensal agrupada pela data de abertura de propostas, com resultado, quadro informativo e contratos PNCP vinculados;
+- `GET /api/licitacoes?year=YYYY`: catálogo anual completo, com agenda agrupada pela data de abertura, incluindo registros sem data;
+- `GET /api/licitacoes?month=YYYY-MM`: recorte mensal compatível com a agenda, com resultado, quadro informativo e contratos PNCP vinculados;
 - `GET /api/secretaries`; `POST /api/secretaries`;
 - `POST /api/contracts/{id}/secretary`: atribuição humana;
 - `GET /api/sync`: última sincronização e progresso;

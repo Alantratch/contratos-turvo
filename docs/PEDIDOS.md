@@ -16,6 +16,18 @@ Cada solicitação de alteração deve gerar entrada rastreável, commit(s), tes
 
 **Status:** pronto para homologação.
 
+## CT-0012 — 2026-11-11 — Catálogo anual e detalhe em modal
+
+**Pedido:** ao clicar na licitação abrir um popup, catalogar o ano inteiro e refinar a classificação visual e de resultado.
+
+**Implementação:** `/api/licitacoes?year=YYYY` passou a retornar o catálogo anual completo, inclusive registros sem data de abertura; a agenda mensal usa os mesmos itens e o clique em qualquer evento ou linha abre modal com objeto, datas, valores, situação, contrato e fontes oficiais. As etapas agora distinguem sessão futura, sessão de hoje, em andamento, aguardando resultado, resultado publicado, contrato publicado e anulada/revogada/suspensa.
+
+**Consistência:** “Aguardando resultado” só aparece depois do encerramento da janela de propostas; enquanto ela estiver aberta, o item fica “Em andamento”. O campo oficial `existeResultado`, valor homologado e contrato vinculado continuam preservados para auditoria.
+
+**Aceite técnico:** 17 testes automatizados verdes, JavaScript/Python válidos e catálogo anual coberto por teste com registro sem data.
+
+**Status:** pronto para homologação e publicação.
+
 ## CT-0010 — 2026-11-11 — Calendário em formato de agenda móvel
 
 **Pedido:** aproximar o calendário da agenda pública de licitações de Turvo, usar Bootstrap e melhorar a leitura no celular sem apresentar dados inconsistentes.

@@ -443,7 +443,7 @@ def serialize_contract_term(term: ContractTerm) -> dict:
     }
 
 
-def procurement_phase(p: Procurement, today: date | None = None) -> dict[str, str]:
+def procurement_phase(p: Procurement, contracts: list[Contract] | None = None, today: date | None = None) -> dict[str, str]:
     today = today or date.today()
     source_status = (p.status or "").casefold()
     if "anulad" in source_status:
@@ -452,17 +452,22 @@ def procurement_phase(p: Procurement, today: date | None = None) -> dict[str, st
         return {"key": "revoked", "label": "Revogada"}
     if "suspens" in source_status:
         return {"key": "suspended", "label": "Suspensa"}
-    if p.result_exists:
+    if p.result_exists or p.awarded_amount is not None:
         return {"key": "result", "label": "Resultado publicado"}
     if p.opening_date and p.opening_date > today:
         return {"key": "scheduled", "label": "Sessão agendada"}
     if p.opening_date and p.opening_date == today:
         return {"key": "today", "label": "Sessão hoje"}
-    return {"key": "held", "label": "Sessão realizada · resultado pendente"}
+    if p.proposal_end and p.proposal_end >= today:
+        return {"key": "in_progress", "label": "Em andamento"}
+    if contracts:
+        return {"key": "contracted", "label": "Contrato publicado"}
+    return {"key": "pending", "label": "Aguardando resultado"}
 
 
 def serialize_procurement(p: Procurement, contracts: list[Contract] | None = None) -> dict:
-    phase = procurement_phase(p)
+    contracts = contracts or []
+    phase = procurement_phase(p, contracts)
     linked_contracts = [{
         "id": contract.id,
         "number": contract.number,
@@ -471,6 +476,17 @@ def serialize_procurement(p: Procurement, contracts: list[Contract] | None = Non
         "end_date": contract.end_date.isoformat() if contract.end_date else None,
         "pncp_key": contract.pncp_key,
     } for contract in (contracts or [])]
+    result_labels = {
+        "scheduled": "Ainda não ocorreu",
+        "today": "Sessão hoje",
+        "in_progress": "Em andamento",
+        "pending": "Aguardando publicação do resultado",
+        "result": "Resultado publicado",
+        "contracted": "Contrato publicado",
+        "cancelled": "Não se aplica · anulada",
+        "revoked": "Não se aplica · revogada",
+        "suspended": "Aguardando decisão · suspensa",
+    }
     info_status = "Consultar quadro informativo oficial" if p.info_url else "Não informado pela fonte"
     return {
         "id": p.id, "source_key": p.source_key, "number": p.number,
@@ -483,7 +499,7 @@ def serialize_procurement(p: Procurement, contracts: list[Contract] | None = Non
         "published_at": p.published_at.isoformat() if p.published_at else None,
         "proposal_end": p.proposal_end.isoformat() if p.proposal_end else None,
         "result_exists": p.result_exists,
-        "result_label": "Resultado publicado" if p.result_exists else "Sem resultado publicado",
+        "result_label": result_labels[phase["key"]],
         "phase": phase["key"],
         "phase_label": phase["label"],
         "impugnation_status": info_status,

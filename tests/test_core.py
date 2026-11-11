@@ -137,6 +137,67 @@ def test_licitacoes_api_groups_date_and_links_published_contract():
     assert item["phase"] == "scheduled"
     assert item["impugnation_url"].startswith("https://cnetmobile")
     assert item["contracts"][0]["pncp_key"] == contract["numeroControlePNCP"]
+    assert data["items"][0]["result_label"] == "Ainda não ocorreu"
+
+
+def test_licitacoes_year_catalog_keeps_undated_and_classifies_in_progress():
+    from fastapi.testclient import TestClient
+    today = date.today()
+    in_progress_key = f"78279973000107-1-09998/{today.year}"
+    undated_key = f"78279973000107-1-09999/{today.year}"
+    contracted_key = f"78279973000107-1-09997/{today.year}"
+    in_progress = {
+        "numeroControlePNCP": in_progress_key,
+        "orgaoEntidadeCnpj": "78279973000107",
+        "numeroCompra": "9998",
+        "anoCompraPncp": today.year,
+        "sequencialCompraPncp": 9998,
+        "modalidadeNome": "Pregão - Eletrônico",
+        "situacaoCompraNomePncp": "Divulgada no PNCP",
+        "objetoCompra": "Licitação em andamento",
+        "processo": "9998/2026",
+        "dataAberturaPropostaPncp": (today - timedelta(days=10)).isoformat(),
+        "dataEncerramentoPropostaPncp": (today + timedelta(days=10)).isoformat(),
+        "existeResultado": False,
+    }
+    undated = dict(in_progress)
+    undated.update({
+        "numeroControlePNCP": undated_key,
+        "numeroCompra": "9999",
+        "sequencialCompraPncp": 9999,
+        "objetoCompra": "Licitação sem data de abertura",
+        "dataAberturaPropostaPncp": None,
+        "dataEncerramentoPropostaPncp": None,
+    })
+    contracted = dict(in_progress)
+    contracted.update({
+        "numeroControlePNCP": contracted_key,
+        "numeroCompra": "9997",
+        "sequencialCompraPncp": 9997,
+        "objetoCompra": "Licitação com contrato publicado",
+        "dataAberturaPropostaPncp": (today - timedelta(days=30)).isoformat(),
+        "dataEncerramentoPropostaPncp": (today - timedelta(days=20)).isoformat(),
+    })
+    contract = sample()
+    contract["numeroControlePNCP"] = "78279973000107-2-09997/2026"
+    contract["numeroControlePncpCompra"] = contracted_key
+    with SessionLocal() as db:
+        assert upsert_procurement(db, in_progress) == "inserted"
+        assert upsert_procurement(db, undated) == "inserted"
+        assert upsert_procurement(db, contracted) == "inserted"
+        assert upsert_contract(db, contract) == "inserted"
+        db.commit()
+    with TestClient(__import__("app.main", fromlist=["app"]).app) as client:
+        response = client.get(f"/api/licitacoes?year={today.year}", auth=("test", "test-password"))
+    assert response.status_code == 200
+    data = response.json()
+    items = {item["source_key"]: item for item in data["items"]}
+    assert items[in_progress_key]["phase"] == "in_progress"
+    assert items[in_progress_key]["result_label"] == "Em andamento"
+    assert items[contracted_key]["phase"] == "contracted"
+    assert undated_key in items
+    assert data["summary"]["undated"] >= 1
+    assert all(item["source_key"] != undated_key for day in data["days"] for item in day["items"])
 
 
 def test_units_create_areas_but_skip_generic_municipality():
