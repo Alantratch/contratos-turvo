@@ -58,6 +58,28 @@ class Contract(Base):
     last_seen_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
 
+class Procurement(Base):
+    """Contratação publicada no Compras.gov; não é confundida com contrato assinado."""
+    __tablename__ = "procurements"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    source_key: Mapped[str] = mapped_column(String(110), unique=True, index=True)
+    buyer_cnpj: Mapped[str] = mapped_column(String(14), index=True)
+    number: Mapped[str] = mapped_column(String(70), default="")
+    year: Mapped[int | None] = mapped_column(Integer)
+    sequence: Mapped[int | None] = mapped_column(Integer)
+    modality: Mapped[str] = mapped_column(String(120), default="")
+    status: Mapped[str] = mapped_column(String(120), default="")
+    object: Mapped[str] = mapped_column(Text, default="")
+    process: Mapped[str] = mapped_column(String(120), default="")
+    estimated_amount: Mapped[Decimal | None] = mapped_column(Numeric(18, 2))
+    awarded_amount: Mapped[Decimal | None] = mapped_column(Numeric(18, 2))
+    published_at: Mapped[date | None] = mapped_column(Date, index=True)
+    proposal_end: Mapped[date | None] = mapped_column(Date)
+    digest: Mapped[str] = mapped_column(String(64))
+    raw: Mapped[dict] = mapped_column(JSON)
+    last_seen_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
 class ContractRevision(Base):
     __tablename__ = "contract_revisions"
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -149,7 +171,7 @@ def upsert_contract(session: Session, payload: dict) -> str:
         "year": raw.get("anoContrato"),
         "sequence": raw.get("sequencialContrato"),
         "supplier": str(raw.get("nomeRazaoSocialFornecedor") or "")[:300],
-        "object": str(raw.get("objetoContrato") or ""),
+        "object": str(raw.get("objetoContrato") or raw.get("objeto") or ""),
         "unit": str(unit.get("nomeUnidade") or "")[:250],
         "unit_code": str(unit.get("codigoUnidade") or "")[:100],
         "amount": parse_amount(raw.get("valorGlobal")),
@@ -171,6 +193,46 @@ def upsert_contract(session: Session, payload: dict) -> str:
     return status
 
 
+def upsert_procurement(session: Session, payload: dict) -> str:
+    """Importa contratações do Compras.gov sem apresentá-las como contratos."""
+    if not isinstance(payload, dict):
+        return "ignored"
+    buyer = re.sub(r"\D", "", str(payload.get("orgaoEntidadeCnpj") or ""))
+    key = str(payload.get("numeroControlePNCP") or "").strip()
+    if buyer != TARGET_CNPJ or not key:
+        return "ignored"
+    raw = json.loads(json.dumps(payload, ensure_ascii=False, default=str))
+    digest = hashlib.sha256(json.dumps(raw, sort_keys=True, ensure_ascii=False).encode()).hexdigest()
+    current = session.scalar(select(Procurement).where(Procurement.source_key == key))
+    if current and current.digest == digest:
+        current.last_seen_at = utcnow()
+        return "unchanged"
+    fields = {
+        "buyer_cnpj": buyer,
+        "number": str(raw.get("numeroCompra") or "")[:70],
+        "year": raw.get("anoCompraPncp"),
+        "sequence": raw.get("sequencialCompraPncp"),
+        "modality": str(raw.get("modalidadeNome") or "")[:120],
+        "status": str(raw.get("situacaoCompraNomePncp") or "")[:120],
+        "object": str(raw.get("objetoCompra") or ""),
+        "process": str(raw.get("processo") or "")[:120],
+        "estimated_amount": parse_amount(raw.get("valorTotalEstimado")),
+        "awarded_amount": parse_amount(raw.get("valorTotalHomologado")),
+        "published_at": parse_date(raw.get("dataPublicacaoPncp")),
+        "proposal_end": parse_date(raw.get("dataEncerramentoPropostaPncp")),
+        "digest": digest,
+        "raw": raw,
+        "last_seen_at": utcnow(),
+    }
+    status = "updated" if current else "inserted"
+    if current is None:
+        session.add(Procurement(source_key=key, **fields))
+    else:
+        for column, value in fields.items():
+            setattr(current, column, value)
+    return status
+
+
 def serialize_contract(c: Contract) -> dict:
     return {
         "id": c.id, "pncp_key": c.pncp_key, "number": c.number,
@@ -181,4 +243,17 @@ def serialize_contract(c: Contract) -> dict:
         "end_date": c.end_date.isoformat() if c.end_date else None,
         "secretary_id": c.secretary_id,
         "secretary": c.secretary.name if c.secretary else None,
+    }
+
+
+def serialize_procurement(p: Procurement) -> dict:
+    return {
+        "id": p.id, "source_key": p.source_key, "number": p.number,
+        "year": p.year, "sequence": p.sequence, "buyer_cnpj": p.buyer_cnpj,
+        "modality": p.modality, "status": p.status, "object": p.object,
+        "process": p.process,
+        "estimated_amount": str(p.estimated_amount) if p.estimated_amount is not None else None,
+        "awarded_amount": str(p.awarded_amount) if p.awarded_amount is not None else None,
+        "published_at": p.published_at.isoformat() if p.published_at else None,
+        "proposal_end": p.proposal_end.isoformat() if p.proposal_end else None,
     }

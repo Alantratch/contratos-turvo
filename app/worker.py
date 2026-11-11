@@ -14,12 +14,13 @@ from sqlalchemy.orm import Session, joinedload
 
 from .core import (
     AlertDelivery, Contract, SyncRun, SyncState,
-    SessionLocal, TARGET_CNPJ, init_db, upsert_contract, utcnow,
+    SessionLocal, TARGET_CNPJ, init_db, upsert_contract, upsert_procurement, utcnow,
 )
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 LOG = logging.getLogger("contratos")
 BASE = "https://pncp.gov.br/api/consulta/v1"
+COMPRAS_BASE = "https://dadosabertos.compras.gov.br"
 PAGE_SIZE = 100
 
 
@@ -116,6 +117,65 @@ def sync_updates():
     sync_window("/contratos", today - timedelta(days=7), today, "recent-publication")
 
 
+def compras_pages(client: httpx.Client, modality: int, begin: date, end: date):
+    page = 1
+    while True:
+        query = {
+            "dataPublicacaoPncpInicial": begin.isoformat(),
+            "dataPublicacaoPncpFinal": end.isoformat(),
+            "orgaoEntidadeCnpj": TARGET_CNPJ,
+            "codigoModalidade": modality,
+            "pagina": page,
+            "tamanhoPagina": 500,
+        }
+        response = client.get(COMPRAS_BASE + "/modulo-contratacoes/1_consultarContratacoes_PNCP_14133", params=query)
+        if response.status_code == 400:
+            return
+        response.raise_for_status()
+        body = response.json()
+        items = body.get("resultado") or []
+        if not isinstance(items, list):
+            raise ValueError("Resposta inesperada do Compras.gov: resultado não é lista")
+        if items:
+            yield items
+        total_pages = int(body.get("totalPaginas") or 1)
+        if page >= total_pages:
+            break
+        if page >= 10000:
+            raise ValueError("Paginação excessiva no Compras.gov; sincronização interrompida")
+        page += 1
+
+
+def sync_procurements():
+    today = date.today()
+    start = date(today.year, 1, 1)
+    with SessionLocal() as session:
+        run = SyncRun(kind="compras-gov")
+        session.add(run)
+        session.commit()
+        try:
+            processed = 0
+            with httpx.Client(timeout=25, headers={"Accept": "application/json", "User-Agent": "ContratosTurvo/0.1"}) as client:
+                for modality in range(1, 15):
+                    for batch in compras_pages(client, modality, start, today):
+                        for item in batch:
+                            result = upsert_procurement(session, item)
+                            processed += int(result in ("inserted", "updated"))
+                        session.commit()
+            run.processed = processed
+            run.status = "ok"
+            run.finished_at = utcnow()
+            session.commit()
+            LOG.info("compras-gov %s..%s: %d alterações", start, today, processed)
+        except Exception as exc:
+            session.rollback()
+            run.status = "error"
+            run.finished_at = utcnow()
+            run.error = str(exc)[:800]
+            session.commit()
+            LOG.exception("Falha Compras.gov %s..%s", start, today)
+
+
 def alert_threshold(days: int) -> int | None:
     if days < 0 or days > 120:
         return None
@@ -194,6 +254,7 @@ def main():
         try:
             sync_publication()
             sync_updates()
+            sync_procurements()
             alerts()
         except Exception:
             LOG.exception("Falha no ciclo do coletor")

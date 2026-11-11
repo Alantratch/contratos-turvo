@@ -16,8 +16,8 @@ from sqlalchemy import func, or_, select, text
 from sqlalchemy.orm import Session, joinedload
 
 from .core import (
-    AuditEvent, Contract, Secretary, SyncRun, SyncState,
-    SessionLocal, init_db, serialize_contract
+    AuditEvent, Contract, Procurement, Secretary, SyncRun, SyncState,
+    SessionLocal, init_db, serialize_contract, serialize_procurement
 )
 
 
@@ -100,6 +100,7 @@ def summary(session: Session = Depends(db)):
     upcoming = session.scalar(select(func.count()).select_from(Contract).where(Contract.end_date.between(today, today + timedelta(days=30)))) or 0
     expired = session.scalar(select(func.count()).select_from(Contract).where(Contract.end_date < today)) or 0
     unclassified = session.scalar(select(func.count()).select_from(Contract).where(Contract.secretary_id.is_(None))) or 0
+    procurements = session.scalar(select(func.count()).select_from(Procurement)) or 0
     groups = session.execute(
         select(Secretary.name, func.count(Contract.id))
         .join(Contract, Contract.secretary_id == Secretary.id)
@@ -111,6 +112,7 @@ def summary(session: Session = Depends(db)):
     return {
         "all": all_contracts, "active": active, "upcoming": upcoming,
         "expired": expired, "unclassified": unclassified,
+        "procurements": procurements,
         "by_secretary": [{"name": n, "count": count} for n, count in groups],
         "sync": {
             "status": latest.status,
@@ -167,15 +169,35 @@ def calendar(
         raise HTTPException(422, "Mês fora do intervalo permitido")
     first_day = date(year, month_number, 1)
     next_month = date(year + 1, 1, 1) if month_number == 12 else date(year, month_number + 1, 1)
-    stmt = (
-        select(Contract.end_date, func.count(Contract.id))
-        .where(Contract.end_date >= first_day, Contract.end_date < next_month)
+    stmt = select(Contract).options(joinedload(Contract.secretary)).where(
+        Contract.end_date >= first_day, Contract.end_date < next_month
     )
     if secretary_id is not None:
         stmt = stmt.where(Contract.secretary_id == secretary_id)
-    rows = session.execute(stmt.group_by(Contract.end_date).order_by(Contract.end_date)).all()
-    days = [{"date": due.isoformat(), "count": count} for due, count in rows]
+    grouped = {}
+    for contract in session.scalars(stmt.order_by(Contract.end_date, Contract.id)).all():
+        grouped.setdefault(contract.end_date.isoformat(), []).append(serialize_contract(contract))
+    days = [{"date": due, "count": len(items), "items": items} for due, items in grouped.items()]
     return {"month": month, "total": sum(x["count"] for x in days), "days": days}
+
+
+@app.get("/api/procurements")
+def procurements(
+    q: str = Query("", max_length=100),
+    page: int = Query(1, ge=1),
+    limit: int = Query(25, ge=1, le=100),
+    session: Session = Depends(db),
+):
+    stmt = select(Procurement)
+    if q.strip():
+        term = "%" + q.strip() + "%"
+        stmt = stmt.where(or_(Procurement.number.ilike(term), Procurement.object.ilike(term), Procurement.process.ilike(term)))
+    total = session.scalar(select(func.count()).select_from(stmt.subquery())) or 0
+    rows = session.scalars(
+        stmt.order_by(Procurement.published_at.desc(), Procurement.id.desc())
+        .offset((page - 1) * limit).limit(limit)
+    ).all()
+    return {"total": total, "page": page, "items": [serialize_procurement(row) for row in rows]}
 
 
 @app.get("/api/secretaries")

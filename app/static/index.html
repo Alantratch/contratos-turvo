@@ -20,12 +20,13 @@
       <nav class="nav" aria-label="Navegação principal">
         <button class="nav-item selected" data-view="overview" aria-current="page"><span class="nav-icon" aria-hidden="true">▦</span> Visão geral</button>
         <button class="nav-item" data-view="contracts"><span class="nav-icon" aria-hidden="true">▤</span> Contratos</button>
+        <button class="nav-item" data-view="procurements"><span class="nav-icon" aria-hidden="true">◫</span> Contratações</button>
         <button class="nav-item" data-view="calendar"><span class="nav-icon" aria-hidden="true">▦</span> Calendário</button>
         <button class="nav-item" data-view="secretaries"><span class="nav-icon" aria-hidden="true">▥</span> Secretarias</button>
         <button class="nav-item" data-view="sync"><span class="nav-icon" aria-hidden="true">↻</span> Sincronização</button>
       </nav>
       <div class="sidebar-bottom">
-        <div class="side-info"><span class="dot"></span> Fonte oficial PNCP</div>
+        <div class="side-info"><span class="dot"></span> PNCP + Compras.gov.br</div>
         <p>Dados públicos importados. Confira atos, aditivos e vigências antes de tomar decisões.</p>
         <small>Prefeitura Municipal de Turvo · Paraná</small>
       </div>
@@ -38,13 +39,13 @@
           <span class="breadcrumb">Administração <span class="chevron">/</span> <strong id="breadcrumb">Visão geral</strong></span>
         </div>
         <div class="top-actions">
-          <span class="source-label"><span class="dot"></span> PNCP</span>
+          <span class="source-label"><span class="dot"></span> PNCP + Compras.gov.br</span>
           <span class="avatar" aria-label="Administrador">TI</span>
         </div>
       </header>
 
       <div class="content">
-        <div class="notice" role="note"><strong>Aviso:</strong> o painel exibe datas publicadas no PNCP; a situação contratual e os aditivos devem ser confirmados pelo setor competente.</div>
+        <div class="notice" role="note"><strong>Aviso:</strong> contratos e contratações são exibidos separadamente. Datas, aditivos e situação jurídica devem ser confirmados pelo setor competente.</div>
         <div class="feedback" id="feedback" role="status" aria-live="polite" hidden></div>
 
         <section id="overview" class="view">
@@ -94,6 +95,15 @@
         </section>
 
 
+        <section id="procurements" class="view" hidden>
+          <div class="page-head"><div><p class="eyebrow">COMPRAS PÚBLICAS</p><h1>Contratações</h1><p class="lead">Licitações, pregões e dispensas publicados no Compras.gov.br. Este acervo não é somado aos contratos.</p></div><span class="counter" id="procurements-count">— registros</span></div>
+          <article class="panel table-panel">
+            <div class="filters"><label class="field search-field"><span>Pesquisar contratação, processo ou objeto</span><input id="procurement-search" type="search" placeholder="Número, processo ou palavra-chave"></label></div>
+            <div class="table-wrap"><table><thead><tr><th>Compra / ano</th><th>Modalidade e situação</th><th>Objeto</th><th>Valores</th><th>Publicação</th></tr></thead><tbody id="procurements-body"><tr><td colspan="5" class="empty">Carregando…</td></tr></tbody></table></div>
+            <div class="pagination"><span id="procurement-pagination-text">—</span><div><button class="button button-outline" id="procurement-prev" type="button">Anterior</button> <button class="button button-outline" id="procurement-next" type="button">Próximo</button></div></div>
+          </article>
+        </section>
+
         <section id="calendar" class="view" hidden>
           <div class="page-head">
             <div>
@@ -126,7 +136,7 @@
                 <div class="calendar-weekdays" aria-hidden="true"><span>Seg</span><span>Ter</span><span>Qua</span><span>Qui</span><span>Sex</span><span>Sáb</span><span>Dom</span></div>
                 <div id="calendar-grid" class="calendar-grid" aria-label="Dias do mês"></div>
               </div>
-              <p class="calendar-disclaimer">Datas extraídas dos registros importados do PNCP. Aditivos e vigência jurídica precisam de conferência.</p>
+              <p class="calendar-disclaimer">Datas e objetos vêm dos contratos importados do PNCP. As contratações do Compras.gov.br ficam na aba própria; aditivos e vigência jurídica precisam de conferência.</p>
             </article>
             <aside class="panel calendar-details" aria-label="Vencimentos da data selecionada">
               <div class="calendar-details-head">
@@ -167,7 +177,7 @@
           <article class="panel table-panel"><div class="panel-head"><div><h2>Últimas execuções</h2><p>Erros são registrados e não apagam contratos já armazenados</p></div></div><div class="table-wrap"><table><thead><tr><th>Rotina</th><th>Início</th><th>Processados</th><th>Estado</th></tr></thead><tbody id="sync-body"><tr><td colspan="4" class="empty">Nenhuma execução registrada.</td></tr></tbody></table></div></article>
         </section>
       </div>
-      <footer class="footer"><span>Contratos Turvo · Informação pública com gestão interna</span><span>Dados oficiais: PNCP</span></footer>
+      <footer class="footer"><span>Contratos Turvo · Informação pública com gestão interna</span><span>Dados oficiais: PNCP e Compras.gov.br</span></footer>
     </main>
   </div>
 </body>
