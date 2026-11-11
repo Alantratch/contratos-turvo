@@ -6,6 +6,10 @@
   let pageTotal = 0;
   let secretaries = [];
   let searchTimer = null;
+  let calendarMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+  let calendarSelectedDay = null;
+  let contractDateFilter = null;
+  let calendarRequest = 0;
 
   const html = (text) => String(text ?? "").replace(/[&<>"']/g, (c) => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
   const date = (s) => s ? new Intl.DateTimeFormat("pt-BR", {timeZone:"UTC"}).format(new Date(s + "T12:00:00Z")) : "Não informada";
@@ -48,11 +52,12 @@
       if (selected) button.setAttribute("aria-current", "page");
       else button.removeAttribute("aria-current");
     });
-    const names = {overview:"Visão geral",contracts:"Contratos",secretaries:"Secretarias",sync:"Sincronização"};
+    const names = {overview:"Visão geral",contracts:"Contratos",calendar:"Calendário",secretaries:"Secretarias",sync:"Sincronização"};
     $("breadcrumb").textContent = names[next];
     $("sidebar").classList.remove("open");
     $("menu-toggle").setAttribute("aria-expanded", "false");
     if (next === "contracts") loadContracts();
+    if (next === "calendar") loadCalendar();
     if (next === "secretaries") loadSecretaries();
     if (next === "sync") loadSync();
   }
@@ -86,6 +91,9 @@
       const current = $("secretary-filter").value;
       $("secretary-filter").innerHTML = '<option value="">Todas</option>' + secretaries.map(s => '<option value="' + s.id + '">' + html(s.name) + '</option>').join("");
       $("secretary-filter").value = current;
+      const calendarCurrent = $("calendar-secretary-filter").value;
+      $("calendar-secretary-filter").innerHTML = '<option value="">Todas as secretarias</option>' + secretaries.map(s => '<option value="' + s.id + '">' + html(s.name) + '</option>').join("");
+      $("calendar-secretary-filter").value = calendarCurrent;
       $("secretary-list").innerHTML = secretaries.length ? secretaries.map((s) =>
         '<div class="secretary-item"><div><strong>' + html(s.name) + '</strong><small>' + html(s.email || "Sem e-mail cadastrado") + '</small></div><span class="tag">Cadastro</span></div>'
       ).join("") : "Nenhuma secretaria cadastrada.";
@@ -105,6 +113,9 @@
       const secretary = $("secretary-filter").value;
       const params = new URLSearchParams({q, period, page:String(page), limit:"25"});
       if (secretary) params.set("secretary_id", secretary);
+      if (contractDateFilter) params.set("due_date", contractDateFilter);
+      $("clear-calendar-date").hidden = !contractDateFilter;
+      $("clear-calendar-date").textContent = contractDateFilter ? "Limpar data: " + date(contractDateFilter) : "Limpar filtro da data";
       const result = await api("/api/contracts?" + params);
       pageTotal = result.total;
       $("contracts-count").textContent = number(pageTotal) + " registros";
@@ -135,6 +146,111 @@
     } catch (err) { feedback("Não foi possível consultar sincronização: " + err.message, true); }
   }
 
+
+  function isoLocal(d) {
+    return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
+  }
+
+  function monthKey() {
+    return calendarMonth.getFullYear() + "-" + String(calendarMonth.getMonth() + 1).padStart(2, "0");
+  }
+
+  function calendarMonthShift(delta) {
+    const next = new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() + delta, 1);
+    if (next.getFullYear() < 2021 || next.getFullYear() > 2100) return;
+    calendarMonth = next;
+    calendarSelectedDay = null;
+    loadCalendar();
+  }
+
+  async function loadCalendar() {
+    const requestId = ++calendarRequest;
+    const month = monthKey();
+    const year = calendarMonth.getFullYear();
+    const monthIndex = calendarMonth.getMonth();
+    const title = new Intl.DateTimeFormat("pt-BR", {month:"long", year:"numeric"}).format(calendarMonth);
+    $("calendar-month-label").textContent = title.charAt(0).toUpperCase() + title.slice(1);
+    $("calendar-grid").textContent = "Carregando vencimentos…";
+    $("calendar-selected-date").textContent = "Aguardando seleção";
+    $("calendar-day-list").textContent = "Carregando…";
+    $("calendar-see-all").hidden = true;
+    const secretaryId = $("calendar-secretary-filter").value;
+    const params = new URLSearchParams({month});
+    if (secretaryId) params.set("secretary_id", secretaryId);
+    try {
+      const data = await api("/api/calendar?" + params);
+      if (requestId !== calendarRequest || view !== "calendar") return;
+      const counts = Object.fromEntries((data.days || []).map(d => [d.date, d.count]));
+      $("calendar-total").textContent = number(data.total) + " vencimento(s) neste mês";
+      const today = isoLocal(new Date());
+      const currentMonth = today.slice(0, 7) === month;
+      const first = new Date(year, monthIndex, 1);
+      const count = new Date(year, monthIndex + 1, 0).getDate();
+      const offset = (first.getDay() + 6) % 7;
+      if (!calendarSelectedDay || !calendarSelectedDay.startsWith(month)) {
+        calendarSelectedDay = currentMonth ? today : ((data.days || [])[0]?.date || isoLocal(first));
+      }
+      const cells = Array.from({length:offset}, () => '<span class="calendar-spacer" aria-hidden="true"></span>');
+      for (let day = 1; day <= count; day++) {
+        const due = isoLocal(new Date(year, monthIndex, day));
+        const total = counts[due] || 0;
+        const soon = total > 0 && remaining(due) >= 0 && remaining(due) <= 30;
+        const classes = ["calendar-day", due === today ? "is-today" : "", due === calendarSelectedDay ? "is-selected" : "", total ? "has-deadlines" : "", soon ? "is-soon" : ""].filter(Boolean).join(" ");
+        const label = day + " de " + title + ": " + total + " vencimentos";
+        cells.push('<button type="button" class="' + classes + '" data-day="' + due + '" aria-label="' + html(label) + '" aria-pressed="' + (due === calendarSelectedDay) + '"><span class="day-number">' + day + '</span>' + (total ? '<span class="day-dot"></span><span class="day-total">' + number(total) + ' venc.</span>' : '') + '</button>');
+      }
+      $("calendar-grid").innerHTML = cells.join("");
+      await showCalendarDay(calendarSelectedDay, requestId);
+    } catch (err) {
+      if (requestId !== calendarRequest) return;
+      $("calendar-grid").textContent = "Não foi possível carregar o calendário.";
+      $("calendar-selected-count").textContent = "Erro na consulta ao banco";
+      $("calendar-day-list").textContent = "Tente recarregar o calendário.";
+      feedback("Calendário indisponível: " + err.message, true);
+    }
+  }
+
+  async function showCalendarDay(day, requestId = calendarRequest) {
+    calendarSelectedDay = day;
+    $("calendar-grid").querySelectorAll("button[data-day]").forEach(button => {
+      const active = button.dataset.day === day;
+      button.classList.toggle("is-selected", active);
+      button.setAttribute("aria-pressed", String(active));
+    });
+    $("calendar-selected-date").textContent = new Intl.DateTimeFormat("pt-BR", {day:"numeric", month:"long", year:"numeric", timeZone:"UTC"}).format(new Date(day + "T12:00:00Z"));
+    $("calendar-selected-count").textContent = "Consultando registros…";
+    $("calendar-day-list").textContent = "Carregando contratos…";
+    $("calendar-see-all").hidden = true;
+    const params = new URLSearchParams({due_date:day, period:"all", page:"1", limit:"25"});
+    const secretaryId = $("calendar-secretary-filter").value;
+    if (secretaryId) params.set("secretary_id", secretaryId);
+    try {
+      const data = await api("/api/contracts?" + params);
+      if (requestId !== calendarRequest || day !== calendarSelectedDay || view !== "calendar") return;
+      $("calendar-selected-count").textContent = number(data.total) + " contrato(s) com vencimento registrado nesta data";
+      $("calendar-day-list").innerHTML = data.items.length ? data.items.map(c =>
+        '<article class="calendar-entry"><div class="entry-top"><strong>' + html(c.number || c.pncp_key) + '</strong>' + status(c.end_date) +
+        '</div><p>' + html(c.supplier || "Fornecedor não informado") + '</p><small>' +
+        html(c.secretary || "Sem secretaria definida") + '</small><small class="calendar-entry-object">' +
+        html((c.object || "Objeto não informado").slice(0, 120)) + '</small></article>'
+      ).join("") : '<p class="muted calendar-empty">Nenhum contrato com vencimento registrado nesse dia.</p>';
+      $("calendar-see-all").hidden = data.total === 0;
+    } catch (err) {
+      if (requestId !== calendarRequest) return;
+      $("calendar-day-list").textContent = "Não foi possível consultar os vencimentos.";
+      feedback("Falha na lista do dia: " + err.message, true);
+    }
+  }
+
+  function showDateInContracts() {
+    if (!calendarSelectedDay) return;
+    contractDateFilter = calendarSelectedDay;
+    $("period-filter").value = "all";
+    $("secretary-filter").value = $("calendar-secretary-filter").value;
+    page = 1;
+    switchView("contracts");
+  }
+
   document.querySelectorAll("[data-view]").forEach((button) => button.addEventListener("click", () => switchView(button.dataset.view)));
   $("menu-toggle").addEventListener("click", () => {
     const opened = $("sidebar").classList.toggle("open");
@@ -142,6 +258,25 @@
   });
   $("refresh").addEventListener("click", () => { loadSummary(); });
   $("refresh-sync").addEventListener("click", loadSync);
+  $("calendar-prev").addEventListener("click", () => calendarMonthShift(-1));
+  $("calendar-next").addEventListener("click", () => calendarMonthShift(1));
+  $("calendar-today").addEventListener("click", () => {
+    const today = new Date();
+    calendarMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+    calendarSelectedDay = isoLocal(today);
+    loadCalendar();
+  });
+  $("calendar-secretary-filter").addEventListener("change", loadCalendar);
+  $("calendar-grid").addEventListener("click", (e) => {
+    const button = e.target.closest("button[data-day]");
+    if (button) showCalendarDay(button.dataset.day);
+  });
+  $("calendar-see-all").addEventListener("click", showDateInContracts);
+  $("clear-calendar-date").addEventListener("click", () => {
+    contractDateFilter = null;
+    page = 1;
+    loadContracts();
+  });
   $("see-all").addEventListener("click", () => { page = 1; $("period-filter").value = "30"; switchView("contracts"); });
   $("contract-search").addEventListener("input", () => {
     clearTimeout(searchTimer);

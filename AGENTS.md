@@ -1,22 +1,33 @@
-# Instruções para Codex e demais agentes
+# AGENTS.md — contrato de execução para agentes e ChatGPT
 
-Projeto: contratos-turvo. Prioridade: sistema auditável, barato, mantenível e seguro para a Prefeitura de Turvo/PR.
+Projeto canônico: `Alantratch/contratos-turvo` (privado). Stack: FastAPI, PostgreSQL, worker PNCP e Docker Compose no Coolify, servidor `localhost`.
 
-## Ponytail — simplicidade com segurança
-Antes de escrever, verificar se a função já existe; escolher a menor mudança que preserva validações, tratamento de erro, segurança e testes. Não adicionar microserviços, filas, Redis ou estruturas duplicadas sem necessidade. Não modificar produção diretamente: código -> PR -> CI -> revisão -> deploy Coolify.
+## Meta permanente (leia primeiro)
+Ver `docs/GOAL.md`. A meta é **entregar um sistema funcionando, conferido e seguro no Coolify local** para contratos históricos e futuros de Turvo, com visualização em calendário por secretaria e alertas auditáveis. Código no Git não significa aplicação em produção; cada status deve ser comprovado.
 
-## UI/UX Pro Max — critérios aplicados
-Sistema administrativo institucional: tipografia legível, hierarquia clara, contraste WCAG AA, navegação por teclado, sem animações gratuitas, layouts responsivos e acesso rápido a pendências. Paleta municipal: azul #082d53, verde #00875a, fundo branco #ffffff e #f8fafc; vermelho somente para risco real; sem gradientes/emoji na interface. Datas em pt-BR e valores em BRL. Nunca usar dados simulados como números reais.
+## Regra inegociável: todo pedido de alteração é versionado
+Para **cada solicitação de mudança de código, infraestrutura, regra, documentação ou layout**:
+1. Verifique o HEAD, leia os arquivos envolvidos e explique o impacto antes de alterar. Não sobrescreva mudanças concorrentes.
+2. Registre o objetivo e critérios de aceite em `docs/PEDIDOS.md` (ou Issue GitHub), atribuindo identificador incremental `CT-XXXX`; um pedido pode englobar commits relacionados, mas nunca alterações sem rastreio.
+3. Trabalhe em branch `feat/CT-XXXX-descricao` ou `fix/CT-XXXX-descricao` quando viável; solicite revisão via PR para alterações que afetem dados, segurança, produção ou infraestrutura. Alterações menores podem usar commit direto quando explicitamente permitido e os testes estiverem verdes.
+4. Commits com Conventional Commits: `feat(calendar): ...`, `fix(sync): ...`, `docs(process): ...`. Não reescreva histórico publicado ou faça force push.
+5. Atualize `CHANGELOG.md`, testes, documentação operacional e versão quando aplicável. Nunca invente evidências de testes. Associe o pedido ao commit/PR na resposta final.
+6. Execute testes de sintaxe, API, segurança, fluxo de dados e build/Compose necessários; se falhar, corrija antes de considerar pronto.
+7. **Deploy apenas com acesso autorizado e recursos identificados.** Primeiro valide GitHub Actions; depois implemente no Coolify; verifique saúde/logs/funcionamento, e registre SHA implantado. Se não houver ferramenta para deploy, declare explicitamente 'não implantado' e forneça o bloqueio exato.
+8. Informe ao final: o que mudou, arquivos tocados, SHA e link do commit, resultado de testes, situação no Coolify, riscos remanescentes e rollback. Nenhuma resposta pode afirmar sucesso de implantação sem evidência.
 
-## Skills opcionais no ambiente Codex
-- Ponytail: https://github.com/DietrichGebert/ponytail (instalar pela forma oficial compatível com Codex).
-- UI/UX Pro Max: `npx ui-ux-pro-max-cli init --ai codex` (revisar arquivos gerados antes de incluir no Git).
+Alterações de produção devem ser reversíveis. Mantenha banco, backups, volumes e segredos fora do Git. Nunca apague dados em uma atualização. Em alterações de banco, use migrações explícitas, compatíveis e com plano de rollback (não confie apenas em `create_all`).
 
-## Segurança
-- Nunca registrar credenciais ou .env no repositório.
-- `TARGET_CNPJ` deve ser validado antes de gravar qualquer contrato.
-- Toda sincronização deve ser idempotente e preservar classificação manual.
-- Nenhum dado novo deve sobrescrever um valor validado por servidor sem confirmação.
-- Nunca enviar alerta sem responsável/email confirmado e flag de envio.
-- Não tornar GitHub privado público, não publicar PostgreSQL na rede.
-- Revisar mudanças em esquema e testes antes do deploy.
+## Padrão visual obrigatório (Ponytail + UI/UX Pro Max como princípios)
+Consultar `docs/DESIGN_SYSTEM.md`. Interface administrativa moderna, minimalista, funcional e responsiva. Paleta institucional: azul `#082d53`, verde `#00875a`, branco `#ffffff`, cinza `#f8fafc`. Sem gradientes, emojis decorativos, ícones misturados ou dashboards com números fictícios. Dar prioridade a calendário real de vencimentos, busca, secretaria, data, alertas e ações pendentes. Tipografia e contrastes WCAG AA, navegação por teclado, foco evidente, labels acessíveis, feedback de carregamento/erro/vazio, telas de celular, datas pt-BR, valores BRL. Não introduzir framework ou bibliotecas desnecessárias.
+
+Ferramentas externas Ponytail e UI/UX Pro Max só podem ser declaradas como **executadas/instaladas** se houver evidência; do contrário, aplicar os princípios de design e engenharia equivalentes.
+
+## Segurança e consistência PNCP
+- `TARGET_CNPJ` deve ser validado antes de salvar; não incluir contratos de outro órgão.
+- Coleta idempotente, tolerante a falhas, e sem excluir contratos existentes após erro.
+- Classificação por secretaria e correções humanas não podem ser sobrescritas automaticamente.
+- Calendário deve refletir datas do banco e não prometer vencimento jurídico sem validação dos aditivos.
+- Alertas externos desabilitados até homologação da secretaria, destinatários e SMTP.
+- HTTP Basic é provisório: para produção, exigir acesso restrito por Cloudflare Access, depois RBAC por usuário, auditoria e backup com restauração testada.
+- Não publicar portas de PostgreSQL, nem senhas, tokens ou arquivos `.env`.

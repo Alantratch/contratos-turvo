@@ -4,6 +4,12 @@ Painel interno da Prefeitura de Turvo/PR para monitoramento de contratos publica
 
 **Estado:** MVP funcional sujeito a homologação de dados, destinatários, autenticação e deploy. O sistema não substitui a validação de contratos/aditivos pela área responsável.
 
+## Meta e versionamento
+
+Meta: implantar e homologar o sistema no Coolify **localhost**. Cada pedido de alteração deve ser registrado em `docs/PEDIDOS.md` e rastreado por commit, testes e atualização do `CHANGELOG.md`. Ver `docs/GOAL.md` e `AGENTS.md`.
+
+O painel inclui **calendário de vencimentos** por mês e secretaria, com detalhes ao clicar em um dia. Os números são calculados a partir do banco local importado do PNCP, e não são dados simulados.
+
 ## Instalação Coolify
 
 1. Em **Projects > New Resource > Git Repository** selecione este repositório **privado** via GitHub App autorizada ou SSH Deploy Key somente-leitura.
@@ -29,4 +35,8 @@ O primeiro carregamento histórico avança por janelas de 30 dias desde `SYNC_ST
 ### Documentação
 - `docs/OPERACAO.md`: validação, deploy, alertas e recuperação.
 - `docs/ARQUITETURA.md`: modelo, API e limitações.
-- `AGENTS.md`: normas para Codex, Ponytail e UI/UX Pro Max.
+- `AGENTS.md`: normas obrigatórias para agentes.
+- `docs/PEDIDOS.md`: registro de cada pedido e critérios de aceite.
+- `docs/GOAL.md`: meta de chegar à produção segura.
+- `docs/DESIGN_SYSTEM.md`: identidade moderna e diretrizes de acessibilidade.
+- `CHANGELOG.md`: histórico de versões.

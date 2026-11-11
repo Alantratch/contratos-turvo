@@ -20,6 +20,7 @@
       <nav class="nav" aria-label="Navegação principal">
         <button class="nav-item selected" data-view="overview" aria-current="page"><span class="nav-icon" aria-hidden="true">▦</span> Visão geral</button>
         <button class="nav-item" data-view="contracts"><span class="nav-icon" aria-hidden="true">▤</span> Contratos</button>
+        <button class="nav-item" data-view="calendar"><span class="nav-icon" aria-hidden="true">▦</span> Calendário</button>
         <button class="nav-item" data-view="secretaries"><span class="nav-icon" aria-hidden="true">▥</span> Secretarias</button>
         <button class="nav-item" data-view="sync"><span class="nav-icon" aria-hidden="true">↻</span> Sincronização</button>
       </nav>
@@ -85,10 +86,58 @@
               <label class="field search-field"><span>Pesquisar contrato, fornecedor ou objeto</span><input id="contract-search" type="search" placeholder="Número, fornecedor ou palavra-chave"></label>
               <label class="field"><span>Prazo</span><select id="period-filter"><option value="all">Todos os prazos</option><option value="30">Até 30 dias</option><option value="60">Até 60 dias</option><option value="90">Até 90 dias</option><option value="expired">Vigência encerrada</option><option value="unknown">Sem data informada</option></select></label>
               <label class="field"><span>Secretaria</span><select id="secretary-filter"><option value="">Todas</option></select></label>
+              <button id="clear-calendar-date" class="button button-outline" type="button" hidden>Limpar filtro da data</button>
             </div>
             <div class="table-wrap"><table><thead><tr><th>Contrato / ano</th><th>Fornecedor e objeto</th><th>Secretaria responsável</th><th>Vigência final</th><th>Fonte</th></tr></thead><tbody id="contracts-body"><tr><td colspan="5" class="empty">Carregando…</td></tr></tbody></table></div>
             <div class="pagination"><span id="pagination-text">—</span><div><button class="button button-outline" id="prev" type="button">Anterior</button> <button class="button button-outline" id="next" type="button">Próximo</button></div></div>
           </article>
+        </section>
+
+
+        <section id="calendar" class="view" hidden>
+          <div class="page-head">
+            <div>
+              <p class="eyebrow">AGENDA DE VIGÊNCIAS</p>
+              <h1>Calendário de vencimentos</h1>
+              <p class="lead">Visualize prazos por dia e secretaria. Selecione uma data para conferir contratos.</p>
+            </div>
+            <button class="button button-outline" id="calendar-today" type="button">Ir para hoje</button>
+          </div>
+          <div class="calendar-layout">
+            <article class="panel calendar-panel" aria-label="Calendário mensal de vencimentos">
+              <div class="calendar-toolbar">
+                <div>
+                  <p class="eyebrow">VENCIMENTOS DO MÊS</p>
+                  <h2 id="calendar-month-label" aria-live="polite">Carregando calendário…</h2>
+                </div>
+                <div class="calendar-toolbar-actions">
+                  <label class="field calendar-secretary-field">
+                    <span>Filtrar secretaria</span>
+                    <select id="calendar-secretary-filter" aria-label="Filtrar calendário por secretaria"><option value="">Todas as secretarias</option></select>
+                  </label>
+                  <div class="calendar-nav">
+                    <button id="calendar-prev" class="button button-outline" type="button" aria-label="Mês anterior">←</button>
+                    <button id="calendar-next" class="button button-outline" type="button" aria-label="Próximo mês">→</button>
+                  </div>
+                </div>
+              </div>
+              <div class="calendar-context"><span id="calendar-total">— vencimentos no mês</span><span class="calendar-legend"><i></i> Prazo nos próximos 30 dias</span></div>
+              <div class="calendar-scroll">
+                <div class="calendar-weekdays" aria-hidden="true"><span>Seg</span><span>Ter</span><span>Qua</span><span>Qui</span><span>Sex</span><span>Sáb</span><span>Dom</span></div>
+                <div id="calendar-grid" class="calendar-grid" aria-label="Dias do mês"></div>
+              </div>
+              <p class="calendar-disclaimer">Datas extraídas dos registros importados do PNCP. Aditivos e vigência jurídica precisam de conferência.</p>
+            </article>
+            <aside class="panel calendar-details" aria-label="Vencimentos da data selecionada">
+              <div class="calendar-details-head">
+                <p class="eyebrow">DATA SELECIONADA</p>
+                <h2 id="calendar-selected-date">Selecione um dia</h2>
+                <p id="calendar-selected-count" class="muted">Aguardando calendário.</p>
+              </div>
+              <div id="calendar-day-list" class="calendar-day-list" aria-live="polite">Selecione um dia para consultar os contratos.</div>
+              <button type="button" id="calendar-see-all" class="button button-outline" hidden>Ver todos os contratos desse dia</button>
+            </aside>
+          </div>
         </section>
 
         <section id="secretaries" class="view" hidden>

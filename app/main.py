@@ -125,7 +125,8 @@ def contracts(
     q: str = Query("", max_length=100),
     page: int = Query(1, ge=1),
     limit: int = Query(25, ge=1, le=100),
-    secretary_id: int | None = None,
+    secretary_id: int | None = Query(None, ge=1),
+    due_date: date | None = None,
     period: str = Query("all", pattern="^(all|30|60|90|expired|unknown)$"),
     session: Session = Depends(db),
 ):
@@ -134,8 +135,10 @@ def contracts(
     if q.strip():
         term = "%" + q.strip() + "%"
         stmt = stmt.where(or_(Contract.number.ilike(term), Contract.supplier.ilike(term), Contract.object.ilike(term)))
-    if secretary_id:
+    if secretary_id is not None:
         stmt = stmt.where(Contract.secretary_id == secretary_id)
+    if due_date is not None:
+        stmt = stmt.where(Contract.end_date == due_date)
     if period in ("30", "60", "90"):
         stmt = stmt.where(Contract.end_date.between(today, today + timedelta(days=int(period))))
     elif period == "expired":
@@ -149,6 +152,30 @@ def contracts(
         .offset((page - 1) * limit).limit(limit)
     ).all()
     return {"total": total, "page": page, "items": [serialize_contract(c) for c in result]}
+
+
+
+@app.get("/api/calendar")
+def calendar(
+    month: str = Query(..., pattern=r"^\d{4}-(0[1-9]|1[0-2])$"),
+    secretary_id: int | None = Query(None, ge=1),
+    session: Session = Depends(db),
+):
+    """Contagem integral de vencimentos por dia: não depende da paginação da tabela."""
+    year, month_number = map(int, month.split("-"))
+    if year < 2021 or year > 2100:
+        raise HTTPException(422, "Mês fora do intervalo permitido")
+    first_day = date(year, month_number, 1)
+    next_month = date(year + 1, 1, 1) if month_number == 12 else date(year, month_number + 1, 1)
+    stmt = (
+        select(Contract.end_date, func.count(Contract.id))
+        .where(Contract.end_date >= first_day, Contract.end_date < next_month)
+    )
+    if secretary_id is not None:
+        stmt = stmt.where(Contract.secretary_id == secretary_id)
+    rows = session.execute(stmt.group_by(Contract.end_date).order_by(Contract.end_date)).all()
+    days = [{"date": due.isoformat(), "count": count} for due, count in rows]
+    return {"month": month, "total": sum(x["count"] for x in days), "days": days}
 
 
 @app.get("/api/secretaries")

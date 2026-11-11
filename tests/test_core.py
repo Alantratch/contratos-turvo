@@ -76,3 +76,28 @@ def test_pncp_adapter_pagination_and_cnpj_filter():
         batches = list(pages(client, "/contratos", date(2026, 10, 1), date(2026, 10, 31)))
     assert len(batches) == 1
     assert batches[0][0]["numeroControlePNCP"] == payload["numeroControlePNCP"]
+
+
+def test_calendar_api_counts_dates_and_filters():
+    from fastapi.testclient import TestClient
+    from app.main import app
+    from app.core import Secretary
+    payload = sample()
+    payload["dataVigenciaFim"] = "2027-12-31"
+    with SessionLocal() as db:
+        upsert_contract(db, payload)
+        db.commit()
+    with TestClient(app) as client:
+        auth = ("test", "test-password")
+        response = client.get("/api/calendar?month=2027-12", auth=auth)
+        assert response.status_code == 200
+        data = response.json()
+        assert data["month"] == "2027-12"
+        assert any(d["date"] == "2027-12-31" and d["count"] >= 1 for d in data["days"])
+        detail = client.get("/api/contracts?due_date=2027-12-31", auth=auth)
+        assert detail.status_code == 200
+        assert detail.json()["total"] >= 1
+        assert all(c["end_date"] == "2027-12-31" for c in detail.json()["items"])
+        assert client.get("/api/calendar?month=2027-13", auth=auth).status_code == 422
+        assert client.get("/api/calendar?month=2027-12").status_code == 401
+        assert client.get("/api/calendar?month=2027-12&secretary_id=999999", auth=auth).json()["total"] == 0

@@ -27,3 +27,8 @@ Executar dump PostgreSQL recorrente com retenção e cópia em outro host. Verif
 - Falha de e-mail: não registra envio como concluído; tenta de novo no próximo ciclo.
 - Backend e worker rodam separados; falhas de API externa não interrompem visualização dos dados existentes.
 - Frontend sem domínio/Cloudflare: verificar configuração de roteamento do serviço `web` na porta 8000.
+
+## Controle de versões, calendário e liberação
+Cada mudança solicitada segue `AGENTS.md` e ganha entrada em `docs/PEDIDOS.md`, commit e `CHANGELOG.md`. Confirme os checks na branch antes do deploy. Em produção, registrar o SHA implantado, a hora, saúde dos serviços e procedimento de rollback; nunca apagar o volume PostgreSQL ao reverter código.
+
+A aba **Calendário** consulta `GET /api/calendar?month=YYYY-MM&secretary_id=...`, que agrega vencimentos registrados, e `GET /api/contracts?due_date=YYYY-MM-DD`, que retorna os contratos daquele dia. O calendário não conclui a validade jurídica do contrato e pode precisar de atualização de termos/aditivos. Segurança e homologação seguem pendentes até comprovadas em `docs/GOAL.md`.
