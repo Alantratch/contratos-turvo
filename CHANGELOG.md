@@ -1,5 +1,11 @@
 # Histórico de versões
 
+## [0.11.0] — 2026-11-11
+- Novo módulo “Agenda de licitações”, separado do acervo de contratos.
+- Calendário por abertura de propostas com filtros de próximas, realizadas, resultado publicado e anuladas/suspensas.
+- Vínculo automático com contrato PNCP pela chave oficial da compra; quadro de impugnações/esclarecimentos fica disponível quando a fonte fornece o link.
+- Migração aditiva do PostgreSQL/SQLite e alertas de e-mail preservados desligados.
+
 ## [0.10.0] — 2026-11-11
 - Calendário refeito no formato de agenda mensal de Turvo, com prévias do objeto, navegação e painel de detalhes do dia.
 - Filtros de todos, próximos e encerrados calculados a partir dos mesmos itens da API, sem contagens independentes ou dados de exemplo.

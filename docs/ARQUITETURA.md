@@ -15,7 +15,8 @@
 ## Tabelas
 - contract_terms: termos publicados pelo PNCP vinculados ao contrato-base, com objeto, tipo, valores, prazo e vigência.
 - `contracts`: chave PNCP única, fornecedor, objeto, valores, vigência, unidade, classificação e JSON original.
-- `procurements`: chave PNCP da contratação, modalidade, situação, objeto, processo, valores e datas do Compras.gov.br.
+- `procurements`: chave PNCP da contratação, modalidade, situação, objeto, processo, valores, abertura/encerramento de propostas, resultado e link do quadro informativo do Compras.gov.br.
+- `contracts.procurement_key`: chave `numeroControlePncpCompra` para relacionar uma contratação publicada ao contrato PNCP correspondente, sem inferência por nome ou processo.
 - `contracts` usa uma chave de origem; registros `pncp_key` iniciados por `equiplano:` vêm do Portal de Transparência e não têm link PNCP.
 - `contract_revisions`: snapshots de cada versão distinta observada após a instalação; **não** é o histórico prévio integral de todos os aditivos.
 - `secretaries`: secretaria e endereço de alerta validado.
@@ -29,6 +30,7 @@
 - `GET /api/summary`: totais e próximos vencimentos;
 - `GET /api/contracts?q=&page=&limit=&period=&secretary_id=`: busca paginada;
 - `GET /api/procurements?q=&page=&limit=`: busca as contratações publicadas no Compras.gov.br;
+- `GET /api/licitacoes?month=YYYY-MM`: agenda mensal agrupada pela data de abertura de propostas, com resultado, quadro informativo e contratos PNCP vinculados;
 - `GET /api/secretaries`; `POST /api/secretaries`;
 - `POST /api/contracts/{id}/secretary`: atribuição humana;
 - `GET /api/sync`: última sincronização e progresso;

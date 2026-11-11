@@ -15,6 +15,11 @@
   let calendarFilter = "all";
   let procurementPage = 1;
   let procurementTotal = 0;
+  let licitacaoMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+  let licitacaoSelectedDay = null;
+  let licitacaoFilter = "all";
+  let licitacaoDays = {};
+  let licitacaoRequest = 0;
 
   const html = (text) => String(text ?? "").replace(/[&<>"']/g, (c) => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
   const date = (s) => s ? new Intl.DateTimeFormat("pt-BR", {timeZone:"UTC"}).format(new Date(s + "T12:00:00Z")) : "Não informada";
@@ -57,12 +62,13 @@
       if (selected) button.setAttribute("aria-current", "page");
       else button.removeAttribute("aria-current");
     });
-    const names = {overview:"Visão geral",contracts:"Contratos",procurements:"Contratações",calendar:"Calendário",secretaries:"Secretarias",sync:"Sincronização"};
+    const names = {overview:"Visão geral",contracts:"Contratos",procurements:"Contratações",licitacoes:"Licitações",calendar:"Calendário",secretaries:"Secretarias",sync:"Sincronização"};
     $("breadcrumb").textContent = names[next];
     document.querySelector(".app-shell").classList.remove("menu-open");
     $("menu-toggle").setAttribute("aria-expanded", "false");
     if (next === "contracts") loadContracts();
     if (next === "procurements") loadProcurements();
+    if (next === "licitacoes") loadLicitacoes();
     if (next === "calendar") loadCalendar();
     if (next === "secretaries") loadSecretaries();
     if (next === "sync") loadSync();
@@ -162,6 +168,110 @@
         '<td>' + date(p.published_at) + '</td></tr>'
       ).join("") : '<tr><td colspan="5" class="empty">Nenhuma contratação encontrada.</td></tr>';
     } catch (err) { feedback("Não foi possível carregar contratações: " + err.message, true); }
+  }
+
+  function licitacaoMonthKey() {
+    return licitacaoMonth.getFullYear() + "-" + String(licitacaoMonth.getMonth() + 1).padStart(2, "0");
+  }
+
+  function licitacaoMonthShift(delta) {
+    const next = new Date(licitacaoMonth.getFullYear(), licitacaoMonth.getMonth() + delta, 1);
+    if (next.getFullYear() < 2021 || next.getFullYear() > 2100) return;
+    licitacaoMonth = next;
+    licitacaoSelectedDay = null;
+    loadLicitacoes();
+  }
+
+  function licitacaoItemsForFilter(items) {
+    return items.filter((item) => {
+      if (licitacaoFilter === "scheduled") return ["scheduled", "today"].includes(item.phase);
+      if (licitacaoFilter === "held") return ["held", "result", "cancelled", "revoked", "suspended"].includes(item.phase);
+      if (licitacaoFilter === "result") return item.result_exists;
+      if (licitacaoFilter === "cancelled") return ["cancelled", "revoked", "suspended"].includes(item.phase);
+      return true;
+    });
+  }
+
+  function renderLicitacoes() {
+    const month = licitacaoMonthKey();
+    const year = licitacaoMonth.getFullYear();
+    const monthIndex = licitacaoMonth.getMonth();
+    const title = new Intl.DateTimeFormat("pt-BR", {month:"long", year:"numeric"}).format(licitacaoMonth);
+    const allItems = Object.values(licitacaoDays).flat();
+    const filteredDays = Object.fromEntries(Object.entries(licitacaoDays).map(([day, items]) => [day, licitacaoItemsForFilter(items)]));
+    const visibleItems = Object.values(filteredDays).flat();
+    const scheduled = allItems.filter((item) => ["scheduled", "today"].includes(item.phase));
+    const held = allItems.filter((item) => ["held", "result", "cancelled", "revoked", "suspended"].includes(item.phase));
+    const result = allItems.filter((item) => item.result_exists);
+    const cancelled = allItems.filter((item) => ["cancelled", "revoked", "suspended"].includes(item.phase));
+    $("licitacao-all-count").textContent = number(allItems.length);
+    $("licitacao-scheduled-count").textContent = number(scheduled.length);
+    $("licitacao-held-count").textContent = number(held.length);
+    $("licitacao-result-count").textContent = number(result.length);
+    $("licitacao-cancelled-count").textContent = number(cancelled.length);
+    $("licitacao-contract-count").textContent = number(allItems.filter((item) => (item.contracts || []).length).length);
+    $("licitacao-total").textContent = number(visibleItems.length) + " licitação(ões) no mês";
+    $("licitacao-month-label").textContent = title.charAt(0).toUpperCase() + title.slice(1);
+    document.querySelectorAll("[data-licitacao-filter]").forEach((button) => button.classList.toggle("is-active", button.dataset.licitacaoFilter === licitacaoFilter));
+    const today = isoLocal(new Date());
+    const currentMonth = today.slice(0, 7) === month;
+    const first = new Date(year, monthIndex, 1);
+    const count = new Date(year, monthIndex + 1, 0).getDate();
+    const offset = (first.getDay() + 6) % 7;
+    const visibleDates = Object.keys(filteredDays).filter((day) => filteredDays[day].length).sort();
+    if (!licitacaoSelectedDay || !licitacaoSelectedDay.startsWith(month) || (visibleDates.length && !filteredDays[licitacaoSelectedDay]?.length)) {
+      licitacaoSelectedDay = visibleDates[0] || (currentMonth ? today : isoLocal(first));
+    }
+    const cells = Array.from({length:offset}, () => '<span class="calendar-spacer" aria-hidden="true"></span>');
+    for (let day = 1; day <= count; day++) {
+      const due = isoLocal(new Date(year, monthIndex, day));
+      const items = filteredDays[due] || [];
+      const preview = items.slice(0, 2).map((item) => '<span class="procurement-event-chip is-' + html(item.phase) + '"><b>' + html(item.number || "Licitação") + '</b><span>' + html((item.object || "Objeto não informado").replace(/\s+/g, " ").trim().slice(0, 72)) + '</span></span>').join("");
+      const extra = items.length > 2 ? '<span class="day-total">+' + number(items.length - 2) + ' outras</span>' : items.length ? '<span class="day-total">' + number(items.length) + ' licitação' + (items.length === 1 ? "" : "ões") + '</span>' : '';
+      const classes = ["calendar-day", due === today ? "is-today" : "", due === licitacaoSelectedDay ? "is-selected" : "", items.length ? "has-deadlines" : ""].filter(Boolean).join(" ");
+      const label = day + " de " + title + ": " + items.length + " licitação(ões)";
+      cells.push('<button type="button" class="' + classes + '" data-licitacao-day="' + due + '" aria-label="' + html(label) + '" aria-pressed="' + (due === licitacaoSelectedDay) + '"><span class="day-number">' + day + '</span>' + (items.length ? '<span class="procurement-event-list">' + preview + '</span>' + extra : '') + '</button>');
+    }
+    $("licitacao-grid").innerHTML = cells.join("");
+    showLicitacaoDay(licitacaoSelectedDay, licitacaoRequest);
+  }
+
+  async function loadLicitacoes() {
+    const requestId = ++licitacaoRequest;
+    const month = licitacaoMonthKey();
+    $("licitacao-grid").textContent = "Carregando licitações…";
+    $("licitacao-day-list").textContent = "Carregando…";
+    try {
+      const data = await api("/api/licitacoes?month=" + month);
+      if (requestId !== licitacaoRequest || view !== "licitacoes") return;
+      licitacaoDays = Object.fromEntries((data.days || []).map((day) => [day.date, day.items || []]));
+      renderLicitacoes();
+    } catch (err) {
+      if (requestId !== licitacaoRequest) return;
+      licitacaoDays = {};
+      $("licitacao-grid").textContent = "Não foi possível carregar a agenda de licitações.";
+      $("licitacao-day-list").textContent = "Tente recarregar a agenda.";
+      feedback("Agenda de licitações indisponível: " + err.message, true);
+    }
+  }
+
+  async function showLicitacaoDay(day, requestId = licitacaoRequest) {
+    licitacaoSelectedDay = day;
+    $("licitacao-grid").querySelectorAll("button[data-licitacao-day]").forEach((button) => {
+      const active = button.dataset.licitacaoDay === day;
+      button.classList.toggle("is-selected", active);
+      button.setAttribute("aria-pressed", String(active));
+    });
+    const items = licitacaoDays[day] ? licitacaoItemsForFilter(licitacaoDays[day]) : [];
+    $("licitacao-selected-date").textContent = new Intl.DateTimeFormat("pt-BR", {day:"numeric", month:"long", year:"numeric", timeZone:"UTC"}).format(new Date(day + "T12:00:00Z"));
+    if (requestId !== licitacaoRequest || day !== licitacaoSelectedDay || view !== "licitacoes") return;
+    $("licitacao-selected-count").textContent = number(items.length) + " licitação(ões) nesta data";
+    $("licitacao-day-list").innerHTML = items.length ? items.map((item) => {
+      const pncpLink = /^\d{14}$/.test(item.buyer_cnpj || "") && Number.isInteger(item.year) && Number.isInteger(item.sequence) ? '<a class="entry-link" target="_blank" rel="noopener noreferrer" href="https://pncp.gov.br/app/editais/' + item.buyer_cnpj + '/' + item.year + '/' + item.sequence + '">Abrir no PNCP ↗</a>' : "";
+      const infoLink = item.impugnation_url ? '<a class="entry-link" target="_blank" rel="noopener noreferrer" href="' + html(item.impugnation_url) + '">Consultar quadro de impugnações ↗</a>' : '<span class="subline">Impugnação: ' + html(item.impugnation_status) + '</span>';
+      const contracts = (item.contracts || []).length ? item.contracts.map((contract) => '<span class="subline">Contrato ' + html(contract.number || contract.pncp_key) + ' · ' + html(contract.supplier || "Fornecedor não informado") + (contract.end_date ? ' · vence ' + date(contract.end_date) : '') + '</span>').join("") : '<span class="subline">' + html(item.contract_status) + '</span>';
+      return '<article class="licitacao-entry"><div class="entry-top"><strong>' + html(item.number || item.source_key) + '</strong><span class="procurement-phase is-' + html(item.phase) + '">' + html(item.phase_label) + '</span></div><p class="calendar-entry-object">' + html(item.object || "Objeto não informado") + '</p><small>' + html(item.modality || "Modalidade não informada") + ' · Processo ' + html(item.process || "não informado") + '</small><small>Abertura de propostas: ' + date(item.opening_date) + ' · Encerramento: ' + date(item.proposal_end) + '</small><small>Resultado: ' + html(item.result_label) + (item.awarded_amount ? ' · Homologado: ' + money(item.awarded_amount) : '') + '</small>' + infoLink + contracts + pncpLink + '</article>';
+    }).join("") : '<p class="muted calendar-empty">Nenhuma licitação nessa data para este filtro.</p>';
   }
 
   async function loadSync() {
@@ -354,6 +464,22 @@
   });
   $("procurement-prev").addEventListener("click", () => { if (procurementPage > 1) { procurementPage--; loadProcurements(); } });
   $("procurement-next").addEventListener("click", () => { if (procurementPage * 25 < procurementTotal) { procurementPage++; loadProcurements(); } });
+  $("licitacao-prev").addEventListener("click", () => licitacaoMonthShift(-1));
+  $("licitacao-next").addEventListener("click", () => licitacaoMonthShift(1));
+  $("licitacao-today").addEventListener("click", () => {
+    const today = new Date();
+    licitacaoMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+    licitacaoSelectedDay = isoLocal(today);
+    loadLicitacoes();
+  });
+  document.querySelectorAll("[data-licitacao-filter]").forEach((button) => button.addEventListener("click", () => {
+    licitacaoFilter = button.dataset.licitacaoFilter;
+    renderLicitacoes();
+  }));
+  $("licitacao-grid").addEventListener("click", (e) => {
+    const button = e.target.closest("button[data-licitacao-day]");
+    if (button) showLicitacaoDay(button.dataset.licitacaoDay);
+  });
   $("prev").addEventListener("click", () => { if (page > 1) { page--; loadContracts(); } });
   $("next").addEventListener("click", () => { if (page * 25 < pageTotal) { page++; loadContracts(); } });
   $("secretary-form").addEventListener("submit", async (e) => {

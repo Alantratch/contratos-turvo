@@ -2,6 +2,20 @@
 
 Cada solicitação de alteração deve gerar entrada rastreável, commit(s), testes e status de implantação. Commits são o histórico imutável; este registro fornece contexto e critérios de aceite. Não gravar segredos.
 
+## CT-0011 — 2026-11-11 — Agenda de licitações
+
+**Pedido:** criar um módulo separado para acompanhar licitações por data, com sessão realizada ou futura, resultado, impugnações e contratos vinculados.
+
+**Implementação:** adicionada a agenda mensal de licitações do Compras.gov.br, com filtros de próximas, realizadas, com resultado e anuladas/suspensas. A data usada é a abertura oficial de propostas; o resultado usa `existeResultado` e `valorTotalHomologado`; o contrato usa a chave oficial `numeroControlePncpCompra` quando o PNCP a fornece.
+
+**Transparência de fonte:** a API pública não entrega um booleano confiável “houve impugnação”. Quando há `informacaoComplementar`, o painel mostra o quadro oficial para consulta; caso contrário, informa que a fonte não declarou essa ocorrência. Não são criados status jurídicos por inferência.
+
+**Escopo preservado:** licitações continuam separadas de contratos e contratações; alertas de e-mail permanecem desligados. A migração de schema é aditiva e preserva dados existentes.
+
+**Aceite técnico:** 16 testes automatizados verdes, API mensal agrupada por data, vínculo de teste com contrato PNCP, JavaScript válido, Compose válido e deploy no Coolify acompanhado de smoke test.
+
+**Status:** pronto para homologação.
+
 ## CT-0010 — 2026-11-11 — Calendário em formato de agenda móvel
 
 **Pedido:** aproximar o calendário da agenda pública de licitações de Turvo, usar Bootstrap e melhorar a leitura no celular sem apresentar dados inconsistentes.

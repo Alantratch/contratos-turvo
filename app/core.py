@@ -8,7 +8,7 @@ import re
 from datetime import date, datetime, timezone
 from decimal import Decimal, InvalidOperation
 
-from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Integer, JSON, Numeric, String, Text, create_engine, select
+from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Integer, JSON, Numeric, String, Text, create_engine, inspect, select, text
 from sqlalchemy.orm import DeclarativeBase, Mapped, Session, mapped_column, relationship, sessionmaker
 
 DATABASE_URL = os.getenv("DATABASE_URL")
@@ -50,6 +50,7 @@ class Contract(Base):
     amount: Mapped[Decimal | None] = mapped_column(Numeric(18, 2))
     start_date: Mapped[date | None] = mapped_column(Date, index=True)
     end_date: Mapped[date | None] = mapped_column(Date, index=True)
+    procurement_key: Mapped[str | None] = mapped_column(String(110), index=True)
     secretary_id: Mapped[int | None] = mapped_column(ForeignKey("secretaries.id"), index=True)
     secretary: Mapped[Secretary | None] = relationship()
     digest: Mapped[str] = mapped_column(String(64))
@@ -104,8 +105,11 @@ class Procurement(Base):
     process: Mapped[str] = mapped_column(String(120), default="")
     estimated_amount: Mapped[Decimal | None] = mapped_column(Numeric(18, 2))
     awarded_amount: Mapped[Decimal | None] = mapped_column(Numeric(18, 2))
+    opening_date: Mapped[date | None] = mapped_column(Date, index=True)
     published_at: Mapped[date | None] = mapped_column(Date, index=True)
     proposal_end: Mapped[date | None] = mapped_column(Date)
+    result_exists: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    info_url: Mapped[str | None] = mapped_column(String(600))
     digest: Mapped[str] = mapped_column(String(64))
     raw: Mapped[dict] = mapped_column(JSON)
     last_seen_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
@@ -158,6 +162,43 @@ class AuditEvent(Base):
 
 def init_db() -> None:
     Base.metadata.create_all(engine)
+    additions = {
+        "contracts": {"procurement_key": "VARCHAR(110)"},
+        "procurements": {
+            "opening_date": "DATE",
+            "result_exists": "BOOLEAN DEFAULT FALSE",
+            "info_url": "VARCHAR(600)",
+        },
+    }
+    with engine.begin() as connection:
+        inspector = inspect(connection)
+        for table, columns in additions.items():
+            existing = {column["name"] for column in inspector.get_columns(table)}
+            for column, definition in columns.items():
+                if column not in existing:
+                    connection.execute(text(f"ALTER TABLE {table} ADD COLUMN {column} {definition}"))
+        connection.execute(text("CREATE INDEX IF NOT EXISTS ix_contracts_procurement_key ON contracts (procurement_key)"))
+        connection.execute(text("CREATE INDEX IF NOT EXISTS ix_procurements_opening_date ON procurements (opening_date)"))
+    changed = False
+    with SessionLocal() as session:
+        for contract in session.scalars(select(Contract).where(Contract.procurement_key.is_(None))).all():
+            key = (contract.raw or {}).get("numeroControlePncpCompra") if isinstance(contract.raw, dict) else None
+            if key:
+                contract.procurement_key = str(key)[:110]
+                changed = True
+        for procurement in session.scalars(select(Procurement)).all():
+            raw = procurement.raw if isinstance(procurement.raw, dict) else {}
+            if procurement.opening_date is None and raw.get("dataAberturaPropostaPncp"):
+                procurement.opening_date = parse_date(raw.get("dataAberturaPropostaPncp"))
+                changed = True
+            if not procurement.result_exists and "existeResultado" in raw:
+                procurement.result_exists = bool(raw.get("existeResultado"))
+                changed = True
+            if procurement.info_url is None and raw.get("informacaoComplementar"):
+                procurement.info_url = extract_url(raw.get("informacaoComplementar"))
+                changed = True
+        if changed:
+            session.commit()
 
 
 def parse_date(value) -> date | None:
@@ -167,6 +208,11 @@ def parse_date(value) -> date | None:
         return date.fromisoformat(str(value)[:10])
     except (ValueError, TypeError):
         return None
+
+
+def extract_url(value: str | None) -> str | None:
+    match = re.search(r"https?://[^\s<>\"]+", str(value or ""))
+    return match.group(0).rstrip(".,;)") if match else None
 
 
 def parse_amount(value) -> Decimal | None:
@@ -215,6 +261,7 @@ def upsert_contract(session: Session, payload: dict) -> str:
         "amount": parse_amount(raw.get("valorGlobal")),
         "start_date": parse_date(raw.get("dataVigenciaInicio")),
         "end_date": parse_date(raw.get("dataVigenciaFim")),
+        "procurement_key": str(raw.get("numeroControlePncpCompra") or "")[:110] or None,
         "digest": digest,
         "raw": raw,
         "last_seen_at": utcnow(),
@@ -320,8 +367,11 @@ def upsert_procurement(session: Session, payload: dict) -> str:
         "process": str(raw.get("processo") or "")[:120],
         "estimated_amount": parse_amount(raw.get("valorTotalEstimado")),
         "awarded_amount": parse_amount(raw.get("valorTotalHomologado")),
+        "opening_date": parse_date(raw.get("dataAberturaPropostaPncp")),
         "published_at": parse_date(raw.get("dataPublicacaoPncp")),
         "proposal_end": parse_date(raw.get("dataEncerramentoPropostaPncp")),
+        "result_exists": bool(raw.get("existeResultado")),
+        "info_url": extract_url(raw.get("informacaoComplementar")),
         "digest": digest,
         "raw": raw,
         "last_seen_at": utcnow(),
@@ -393,7 +443,35 @@ def serialize_contract_term(term: ContractTerm) -> dict:
     }
 
 
-def serialize_procurement(p: Procurement) -> dict:
+def procurement_phase(p: Procurement, today: date | None = None) -> dict[str, str]:
+    today = today or date.today()
+    source_status = (p.status or "").casefold()
+    if "anulad" in source_status:
+        return {"key": "cancelled", "label": "Anulada"}
+    if "revogad" in source_status:
+        return {"key": "revoked", "label": "Revogada"}
+    if "suspens" in source_status:
+        return {"key": "suspended", "label": "Suspensa"}
+    if p.result_exists:
+        return {"key": "result", "label": "Resultado publicado"}
+    if p.opening_date and p.opening_date > today:
+        return {"key": "scheduled", "label": "Sessão agendada"}
+    if p.opening_date and p.opening_date == today:
+        return {"key": "today", "label": "Sessão hoje"}
+    return {"key": "held", "label": "Sessão realizada · resultado pendente"}
+
+
+def serialize_procurement(p: Procurement, contracts: list[Contract] | None = None) -> dict:
+    phase = procurement_phase(p)
+    linked_contracts = [{
+        "id": contract.id,
+        "number": contract.number,
+        "year": contract.year,
+        "supplier": contract.supplier,
+        "end_date": contract.end_date.isoformat() if contract.end_date else None,
+        "pncp_key": contract.pncp_key,
+    } for contract in (contracts or [])]
+    info_status = "Consultar quadro informativo oficial" if p.info_url else "Não informado pela fonte"
     return {
         "id": p.id, "source_key": p.source_key, "number": p.number,
         "year": p.year, "sequence": p.sequence, "buyer_cnpj": p.buyer_cnpj,
@@ -401,6 +479,15 @@ def serialize_procurement(p: Procurement) -> dict:
         "process": p.process,
         "estimated_amount": str(p.estimated_amount) if p.estimated_amount is not None else None,
         "awarded_amount": str(p.awarded_amount) if p.awarded_amount is not None else None,
+        "opening_date": p.opening_date.isoformat() if p.opening_date else None,
         "published_at": p.published_at.isoformat() if p.published_at else None,
         "proposal_end": p.proposal_end.isoformat() if p.proposal_end else None,
+        "result_exists": p.result_exists,
+        "result_label": "Resultado publicado" if p.result_exists else "Sem resultado publicado",
+        "phase": phase["key"],
+        "phase_label": phase["label"],
+        "impugnation_status": info_status,
+        "impugnation_url": p.info_url,
+        "contracts": linked_contracts,
+        "contract_status": "Contrato publicado" if linked_contracts else "Nenhum contrato PNCP vinculado",
     }

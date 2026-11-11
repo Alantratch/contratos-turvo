@@ -311,3 +311,33 @@ td small { display: block; margin-top: 3px; color: var(--muted); font-size: 11px
   .calendar-event-chip b { margin: 0; font-size: 9px; }
   .calendar-summary { align-items: flex-start; flex-direction: column; gap: 5px; padding-bottom: 2px; }
 }
+
+.licitacao-toolbar .calendar-blackbox { align-items: flex-start; }
+.licitacao-toolbar .calendar-filters { max-width: 100%; }
+.licitacao-contract-summary { margin-left: 12px; color: #3f3f46; font-weight: 750; }
+.procurement-event-list { display: grid; gap: 4px; min-width: 0; }
+.procurement-event-chip { display: block; min-width: 0; padding: 5px 6px; overflow: hidden; border-left: 3px solid #2563eb; border-radius: 4px; background: #eff6ff; color: #1e3a8a; font-size: 10px; line-height: 1.25; text-align: left; }
+.procurement-event-chip.is-result { border-color: #198754; background: #eaf7ef; color: #14532d; }
+.procurement-event-chip.is-cancelled, .procurement-event-chip.is-revoked, .procurement-event-chip.is-suspended { border-color: #343a40; background: #f1f3f5; color: #495057; }
+.procurement-event-chip b { display: block; margin-bottom: 2px; overflow: hidden; font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
+.procurement-event-chip span { display: -webkit-box; overflow: hidden; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
+.procurement-phase { display: inline-flex; align-items: center; padding: 3px 6px; border-radius: 999px; background: #eff6ff; color: #1d4ed8; font-size: 10px; font-weight: 750; white-space: nowrap; }
+.procurement-phase.is-result { background: var(--green-soft); color: var(--green); }
+.procurement-phase.is-held { background: var(--amber-soft); color: var(--amber); }
+.procurement-phase.is-cancelled, .procurement-phase.is-revoked, .procurement-phase.is-suspended { background: #f4f4f5; color: #52525b; }
+.licitacao-entry { padding: 12px; border: 1px solid var(--border); border-radius: 8px; background: #fff; }
+.licitacao-entry small { display: block; margin-top: 5px; color: var(--muted); font-size: 10px; line-height: 1.4; }
+.licitacao-entry .entry-link { margin-top: 8px; }
+
+@media (max-width: 820px) {
+  .licitacao-toolbar .calendar-blackbox { align-items: stretch; }
+  .licitacao-toolbar .calendar-filters { flex-wrap: wrap; }
+  .licitacao-contract-summary { margin-left: 0; }
+}
+
+@media (max-width: 560px) {
+  .licitacao-toolbar .calendar-filters { flex-wrap: nowrap; overflow-x: auto; }
+  .procurement-event-chip span { display: none; }
+  .procurement-event-chip b { margin: 0; font-size: 9px; }
+  .procurement-phase { white-space: normal; }
+}

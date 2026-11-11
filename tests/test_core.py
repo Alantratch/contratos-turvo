@@ -1,7 +1,7 @@
 from datetime import date, timedelta
 from app.core import (
     Base, Contract, ContractRevision, ContractTerm, Procurement, Secretary, SessionLocal,
-    auto_classify_contract_units, engine, parse_date, serialize_contract, upsert_contract,
+    auto_classify_contract_units, engine, parse_date, serialize_contract, serialize_procurement, upsert_contract,
     upsert_contract_term, upsert_procurement,
 )
 from app.worker import alert_threshold, equiplano_amount, equiplano_date_range, equiplano_object, equiplano_payload, equiplano_table
@@ -88,12 +88,55 @@ def test_compras_procurement_is_stored_separately():
         "objetoCompra": "Objeto da contratação",
         "processo": "1/2026",
         "valorTotalEstimado": 1000,
+        "dataAberturaPropostaPncp": "2026-01-01T08:00:00",
         "dataPublicacaoPncp": "2026-01-01T10:00:00",
+        "existeResultado": True,
     }
     with SessionLocal() as db:
         assert upsert_procurement(db, payload) == "inserted"
         db.commit()
-        assert db.scalar(select(Procurement).where(Procurement.source_key == payload["numeroControlePNCP"])) is not None
+        stored = db.scalar(select(Procurement).where(Procurement.source_key == payload["numeroControlePNCP"]))
+        assert stored is not None
+        assert stored.opening_date == date(2026, 1, 1)
+        assert serialize_procurement(stored)["phase"] == "result"
+
+
+def test_licitacoes_api_groups_date_and_links_published_contract():
+    from fastapi.testclient import TestClient
+    procurement_key = "78279973000107-1-00008/2027"
+    procurement = {
+        "numeroControlePNCP": procurement_key,
+        "orgaoEntidadeCnpj": "78279973000107",
+        "numeroCompra": "90008",
+        "anoCompraPncp": 2027,
+        "sequencialCompraPncp": 8,
+        "modalidadeNome": "Pregão - Eletrônico",
+        "situacaoCompraNomePncp": "Divulgada no PNCP",
+        "objetoCompra": "Objeto da licitação",
+        "processo": "8/2027",
+        "valorTotalEstimado": 1000,
+        "dataAberturaPropostaPncp": "2027-12-15T08:00:00",
+        "dataEncerramentoPropostaPncp": "2027-12-20T08:30:00",
+        "existeResultado": False,
+        "informacaoComplementar": "Consulte https://cnetmobile.estaleiro.serpro.gov.br/comprasnet-web/public/landing?destino=quadro-informativo&compra=782799730001072027",
+    }
+    contract = sample()
+    contract["numeroControlePNCP"] = "78279973000107-2-00008/2027"
+    contract["numeroControlePncpCompra"] = procurement_key
+    with SessionLocal() as db:
+        assert upsert_procurement(db, procurement) == "inserted"
+        assert upsert_contract(db, contract) == "inserted"
+        db.commit()
+    with TestClient(__import__("app.main", fromlist=["app"]).app) as client:
+        response = client.get("/api/licitacoes?month=2027-12", auth=("test", "test-password"))
+    assert response.status_code == 200
+    data = response.json()
+    assert data["total"] == 1
+    assert data["days"][0]["date"] == "2027-12-15"
+    item = data["days"][0]["items"][0]
+    assert item["phase"] == "scheduled"
+    assert item["impugnation_url"].startswith("https://cnetmobile")
+    assert item["contracts"][0]["pncp_key"] == contract["numeroControlePNCP"]
 
 
 def test_units_create_areas_but_skip_generic_municipality():

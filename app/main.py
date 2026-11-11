@@ -210,7 +210,57 @@ def procurements(
         stmt.order_by(Procurement.published_at.desc(), Procurement.id.desc())
         .offset((page - 1) * limit).limit(limit)
     ).all()
-    return {"total": total, "page": page, "items": [serialize_procurement(row) for row in rows]}
+    linked = linked_contracts(session, [row.source_key for row in rows])
+    return {"total": total, "page": page, "items": [serialize_procurement(row, linked.get(row.source_key, [])) for row in rows]}
+
+
+def linked_contracts(session: Session, procurement_keys: list[str]) -> dict[str, list[Contract]]:
+    if not procurement_keys:
+        return {}
+    grouped: dict[str, list[Contract]] = {}
+    rows = session.scalars(
+        select(Contract).where(Contract.procurement_key.in_(procurement_keys)).order_by(Contract.year, Contract.id)
+    ).all()
+    for contract in rows:
+        grouped.setdefault(contract.procurement_key, []).append(contract)
+    return grouped
+
+
+@app.get("/api/licitacoes")
+def licitacoes(
+    month: str = Query(..., pattern=r"^\d{4}-(0[1-9]|1[0-2])$"),
+    session: Session = Depends(db),
+):
+    """Agenda mensal de licitações pela data oficial de abertura de propostas."""
+    year, month_number = map(int, month.split("-"))
+    if year < 2021 or year > 2100:
+        raise HTTPException(422, "Mês fora do intervalo permitido")
+    first_day = date(year, month_number, 1)
+    next_month = date(year + 1, 1, 1) if month_number == 12 else date(year, month_number + 1, 1)
+    rows = session.scalars(
+        select(Procurement).where(
+            Procurement.opening_date >= first_day, Procurement.opening_date < next_month
+        ).order_by(Procurement.opening_date, Procurement.id)
+    ).all()
+    linked = linked_contracts(session, [row.source_key for row in rows])
+    items = [serialize_procurement(row, linked.get(row.source_key, [])) for row in rows]
+    grouped: dict[str, list[dict]] = {}
+    for item in items:
+        grouped.setdefault(item["opening_date"], []).append(item)
+    summary = {
+        "all": len(items),
+        "scheduled": sum(item["phase"] in {"scheduled", "today"} for item in items),
+        "held": sum(item["phase"] == "held" for item in items),
+        "result": sum(item["result_exists"] for item in items),
+        "cancelled": sum(item["phase"] in {"cancelled", "revoked", "suspended"} for item in items),
+        "contracts": sum(bool(item["contracts"]) for item in items),
+    }
+    return {
+        "month": month,
+        "total": len(items),
+        "summary": summary,
+        "days": [{"date": day, "count": len(day_items), "items": day_items} for day, day_items in grouped.items()],
+    }
 
 
 @app.get("/api/secretaries")
