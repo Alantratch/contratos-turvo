@@ -85,9 +85,9 @@ def index():
     return FileResponse(STATIC / "index.html")
 
 
-@app.get("/assets/{name}", include_in_schema=False)
+@app.get("/assets/{name:path}", include_in_schema=False)
 def assets(name: str):
-    if name not in {"style.css", "app.js", "logo-turvo.png"}:
+    if name not in {"style.css", "app.js", "logo-turvo.png", "vendor/bootstrap.min.css"}:
         raise HTTPException(404)
     media = "text/css" if name.endswith(".css") else "text/javascript" if name.endswith(".js") else "image/png"
     return FileResponse(STATIC / name, media_type=media)

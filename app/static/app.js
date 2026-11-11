@@ -11,6 +11,8 @@
   let contractDateFilter = null;
   let calendarRequest = 0;
   let calendarDays = {};
+  let calendarSourceDays = {};
+  let calendarFilter = "all";
   let procurementPage = 1;
   let procurementTotal = 0;
 
@@ -191,11 +193,63 @@
     loadCalendar();
   }
 
-  async function loadCalendar() {
-    const requestId = ++calendarRequest;
+  function calendarItemsForFilter(items) {
+    return items.filter((item) => {
+      const days = remaining(item.end_date);
+      return calendarFilter === "upcoming" ? days != null && days >= 0 : calendarFilter === "expired" ? days != null && days < 0 : true;
+    });
+  }
+
+  function renderCalendar() {
     const month = monthKey();
     const year = calendarMonth.getFullYear();
     const monthIndex = calendarMonth.getMonth();
+    const title = new Intl.DateTimeFormat("pt-BR", {month:"long", year:"numeric"}).format(calendarMonth);
+    const allItems = Object.values(calendarSourceDays).flat();
+    const upcoming = allItems.filter((item) => { const days = remaining(item.end_date); return days != null && days >= 0; });
+    const expired = allItems.filter((item) => { const days = remaining(item.end_date); return days != null && days < 0; });
+    $("calendar-all-count").textContent = number(allItems.length);
+    $("calendar-upcoming-count").textContent = number(upcoming.length);
+    $("calendar-expired-count").textContent = number(expired.length);
+    document.querySelectorAll("[data-calendar-filter]").forEach((button) => button.classList.toggle("is-active", button.dataset.calendarFilter === calendarFilter));
+    calendarDays = Object.fromEntries(Object.entries(calendarSourceDays).map(([day, items]) => [day, calendarItemsForFilter(items)]));
+    const visibleItems = Object.values(calendarDays).flat();
+    $("calendar-total").textContent = number(visibleItems.length) + " contrato(s) no mês";
+    const today = isoLocal(new Date());
+    const currentMonth = today.slice(0, 7) === month;
+    const first = new Date(year, monthIndex, 1);
+    const count = new Date(year, monthIndex + 1, 0).getDate();
+    const offset = (first.getDay() + 6) % 7;
+    const visibleDates = Object.keys(calendarDays).filter((day) => calendarDays[day].length).sort();
+    if (!calendarSelectedDay || !calendarSelectedDay.startsWith(month) || (visibleDates.length && !calendarDays[calendarSelectedDay]?.length)) {
+      calendarSelectedDay = visibleDates[0] || (currentMonth ? today : isoLocal(first));
+    }
+    const cells = Array.from({length:offset}, () => '<span class="calendar-spacer" aria-hidden="true"></span>');
+    for (let day = 1; day <= count; day++) {
+      const due = isoLocal(new Date(year, monthIndex, day));
+      const items = calendarDays[due] || [];
+      const total = items.length;
+      const days = remaining(due);
+      const soon = total > 0 && days >= 0 && days <= 30;
+      const expiredDay = total > 0 && items.every((item) => { const remainingDays = remaining(item.end_date); return remainingDays != null && remainingDays < 0; });
+      const preview = items.slice(0, 2).map((item) => {
+        const remainingDays = remaining(item.end_date);
+        const kind = remainingDays != null && remainingDays < 0 ? "is-expired" : "is-upcoming";
+        const object = String(item.object || item.supplier || item.number || "Objeto não informado").replace(/\s+/g, " ").trim();
+        return '<span class="calendar-event-chip ' + kind + '"><b>' + html(item.number || "Contrato") + '</b><span>' + html(object.slice(0, 72)) + '</span></span>';
+      }).join("");
+      const extra = total > 2 ? '<span class="day-total">+' + number(total - 2) + ' outros</span>' : total ? '<span class="day-total">' + number(total) + ' contrato' + (total === 1 ? "" : "s") + '</span>' : '';
+      const classes = ["calendar-day", due === today ? "is-today" : "", due === calendarSelectedDay ? "is-selected" : "", total ? "has-deadlines" : "", soon ? "is-soon" : "", expiredDay ? "is-expired" : ""].filter(Boolean).join(" ");
+      const label = day + " de " + title + ": " + total + " contrato(s)";
+      cells.push('<button type="button" class="' + classes + '" data-day="' + due + '" aria-label="' + html(label) + '" aria-pressed="' + (due === calendarSelectedDay) + '"><span class="day-number">' + day + '</span>' + (total ? '<span class="calendar-event-list">' + preview + '</span>' + extra : '') + '</button>');
+    }
+    $("calendar-grid").innerHTML = cells.join("");
+    showCalendarDay(calendarSelectedDay, calendarRequest);
+  }
+
+  async function loadCalendar() {
+    const requestId = ++calendarRequest;
+    const month = monthKey();
     const title = new Intl.DateTimeFormat("pt-BR", {month:"long", year:"numeric"}).format(calendarMonth);
     $("calendar-month-label").textContent = title.charAt(0).toUpperCase() + title.slice(1);
     $("calendar-grid").textContent = "Carregando vencimentos…";
@@ -208,30 +262,12 @@
     try {
       const data = await api("/api/calendar?" + params);
       if (requestId !== calendarRequest || view !== "calendar") return;
-      calendarDays = Object.fromEntries((data.days || []).map(d => [d.date, d.items || []]));
-      const counts = Object.fromEntries((data.days || []).map(d => [d.date, d.count]));
-      $("calendar-total").textContent = number(data.total) + " vencimento(s) neste mês";
-      const today = isoLocal(new Date());
-      const currentMonth = today.slice(0, 7) === month;
-      const first = new Date(year, monthIndex, 1);
-      const count = new Date(year, monthIndex + 1, 0).getDate();
-      const offset = (first.getDay() + 6) % 7;
-      if (!calendarSelectedDay || !calendarSelectedDay.startsWith(month)) {
-        calendarSelectedDay = (data.days || [])[0]?.date || (currentMonth ? today : isoLocal(first));
-      }
-      const cells = Array.from({length:offset}, () => '<span class="calendar-spacer" aria-hidden="true"></span>');
-      for (let day = 1; day <= count; day++) {
-        const due = isoLocal(new Date(year, monthIndex, day));
-        const total = counts[due] || 0;
-        const soon = total > 0 && remaining(due) >= 0 && remaining(due) <= 30;
-        const classes = ["calendar-day", due === today ? "is-today" : "", due === calendarSelectedDay ? "is-selected" : "", total ? "has-deadlines" : "", soon ? "is-soon" : ""].filter(Boolean).join(" ");
-        const label = day + " de " + title + ": " + total + " vencimentos";
-        cells.push('<button type="button" class="' + classes + '" data-day="' + due + '" aria-label="' + html(label) + '" aria-pressed="' + (due === calendarSelectedDay) + '"><span class="day-number">' + day + '</span>' + (total ? '<span class="day-dot"></span><span class="day-total">' + number(total) + ' venc.</span>' : '') + '</button>');
-      }
-      $("calendar-grid").innerHTML = cells.join("");
-      showCalendarDay(calendarSelectedDay, requestId);
+      calendarSourceDays = Object.fromEntries((data.days || []).map((day) => [day.date, day.items || []]));
+      renderCalendar();
     } catch (err) {
       if (requestId !== calendarRequest) return;
+      calendarSourceDays = {};
+      calendarDays = {};
       $("calendar-grid").textContent = "Não foi possível carregar o calendário.";
       $("calendar-selected-count").textContent = "Erro na consulta ao banco";
       $("calendar-day-list").textContent = "Tente recarregar o calendário.";
@@ -292,6 +328,10 @@
     loadCalendar();
   });
   $("calendar-secretary-filter").addEventListener("change", loadCalendar);
+  document.querySelectorAll("[data-calendar-filter]").forEach((button) => button.addEventListener("click", () => {
+    calendarFilter = button.dataset.calendarFilter;
+    renderCalendar();
+  }));
   $("calendar-grid").addEventListener("click", (e) => {
     const button = e.target.closest("button[data-day]");
     if (button) showCalendarDay(button.dataset.day);
