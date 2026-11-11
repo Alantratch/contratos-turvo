@@ -1,6 +1,6 @@
 # Contratos Turvo
 
-Painel interno da Prefeitura de Turvo/PR para monitoramento de contratos publicados no PNCP, com histórico importado, atualização incremental, classificação por secretaria e alertas de vigência.
+Painel interno da Prefeitura de Turvo/PR para monitoramento de contratos publicados no PNCP e contratações publicadas no Compras.gov.br, com histórico importado, atualização incremental, classificação por secretaria e alertas de vigência.
 
 **Estado:** MVP funcional sujeito a homologação de dados, destinatários, autenticação e deploy. O sistema não substitui a validação de contratos/aditivos pela área responsável.
 
@@ -8,7 +8,7 @@ Painel interno da Prefeitura de Turvo/PR para monitoramento de contratos publica
 
 Meta: implantar e homologar o sistema no Coolify **localhost**. Cada pedido de alteração deve ser registrado em `docs/PEDIDOS.md` e rastreado por commit, testes e atualização do `CHANGELOG.md`. Ver `docs/GOAL.md` e `AGENTS.md`.
 
-O painel inclui **calendário de vencimentos** por mês e secretaria, com detalhes ao clicar em um dia. Os números são calculados a partir do banco local importado do PNCP, e não são dados simulados.
+O painel inclui **calendário de vencimentos** por mês e secretaria, mostrando todos os contratos do dia com objeto, fornecedor, valor e situação. Contratações do Compras.gov.br ficam em acervo separado e não são contadas como contratos.
 
 ## Instalação Coolify
 

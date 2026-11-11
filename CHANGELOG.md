@@ -2,6 +2,10 @@
 
 Cada pedido atendido gera registro em `docs/PEDIDOS.md`, alteração rastreável por commit e testes.
 
+## [0.3.0] — 2026-11-11
+- Contratações do Compras.gov.br importadas em acervo separado de contratos.
+- Calendário retorna e exibe todos os contratos do dia com objeto, fornecedor e valor.
+
 ## [0.2.1] — 2026-11-11
 - Sincronização PNCP tolerante a respostas HTTP 204 sem conteúdo.
 - Teste do adaptador para janelas sem contratos.

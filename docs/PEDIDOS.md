@@ -31,3 +31,9 @@ Cada solicitação de alteração deve gerar entrada rastreável, commit(s), tes
 **Aceite técnico:** o worker registra a janela como concluída sem mover dados indevidamente, e o deploy posterior inicia `db`, `worker` e `web` sem habilitar alertas de e-mail.
 
 **Status:** em validação no Coolify `localhost`.
+
+## CT-0003 — 2026-11-11 — Separar contratações e completar calendário
+
+**Pedido:** importar também as contratações do Compras.gov.br, sem misturá-las aos contratos, e mostrar todos os contratos do dia no calendário com objeto.
+
+**Implementação:** tabela/API/tela próprias para contratações; calendário retorna os itens completos do mês e não depende do limite paginado da tabela.

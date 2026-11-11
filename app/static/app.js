@@ -10,6 +10,9 @@
   let calendarSelectedDay = null;
   let contractDateFilter = null;
   let calendarRequest = 0;
+  let calendarDays = {};
+  let procurementPage = 1;
+  let procurementTotal = 0;
 
   const html = (text) => String(text ?? "").replace(/[&<>"']/g, (c) => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
   const date = (s) => s ? new Intl.DateTimeFormat("pt-BR", {timeZone:"UTC"}).format(new Date(s + "T12:00:00Z")) : "Não informada";
@@ -52,11 +55,12 @@
       if (selected) button.setAttribute("aria-current", "page");
       else button.removeAttribute("aria-current");
     });
-    const names = {overview:"Visão geral",contracts:"Contratos",calendar:"Calendário",secretaries:"Secretarias",sync:"Sincronização"};
+    const names = {overview:"Visão geral",contracts:"Contratos",procurements:"Contratações",calendar:"Calendário",secretaries:"Secretarias",sync:"Sincronização"};
     $("breadcrumb").textContent = names[next];
     $("sidebar").classList.remove("open");
     $("menu-toggle").setAttribute("aria-expanded", "false");
     if (next === "contracts") loadContracts();
+    if (next === "procurements") loadProcurements();
     if (next === "calendar") loadCalendar();
     if (next === "secretaries") loadSecretaries();
     if (next === "sync") loadSync();
@@ -134,6 +138,25 @@
     } catch (err) { feedback("Não foi possível carregar contratos: " + err.message, true); }
   }
 
+  async function loadProcurements() {
+    try {
+      const q = $("procurement-search").value.trim();
+      const data = await api("/api/procurements?" + new URLSearchParams({q, page:String(procurementPage), limit:"25"}));
+      procurementTotal = data.total;
+      $("procurements-count").textContent = number(data.total) + " registros";
+      $("procurement-pagination-text").textContent = "Página " + procurementPage + " · " + number(data.total) + " resultado(s)";
+      $("procurement-prev").disabled = procurementPage <= 1;
+      $("procurement-next").disabled = procurementPage * 25 >= procurementTotal;
+      $("procurements-body").innerHTML = data.items.length ? data.items.map((p) =>
+        '<tr><td><strong>' + html(p.number || p.source_key) + '</strong><span class="subline">' + html(p.year || "") + ' · Processo ' + html(p.process || "não informado") + '</span></td>' +
+        '<td><strong>' + html(p.modality || "Não informada") + '</strong><span class="subline">' + html(p.status || "Situação não informada") + '</span></td>' +
+        '<td><span class="subline procurement-object">' + html(p.object || "Objeto não informado") + '</span></td>' +
+        '<td><span class="subline">Estimado: ' + money(p.estimated_amount) + '</span><span class="subline">Homologado: ' + money(p.awarded_amount) + '</span></td>' +
+        '<td>' + date(p.published_at) + '</td></tr>'
+      ).join("") : '<tr><td colspan="5" class="empty">Nenhuma contratação encontrada.</td></tr>';
+    } catch (err) { feedback("Não foi possível carregar contratações: " + err.message, true); }
+  }
+
   async function loadSync() {
     try {
       const data = await api("/api/sync");
@@ -180,6 +203,7 @@
     try {
       const data = await api("/api/calendar?" + params);
       if (requestId !== calendarRequest || view !== "calendar") return;
+      calendarDays = Object.fromEntries((data.days || []).map(d => [d.date, d.items || []]));
       const counts = Object.fromEntries((data.days || []).map(d => [d.date, d.count]));
       $("calendar-total").textContent = number(data.total) + " vencimento(s) neste mês";
       const today = isoLocal(new Date());
@@ -200,7 +224,7 @@
         cells.push('<button type="button" class="' + classes + '" data-day="' + due + '" aria-label="' + html(label) + '" aria-pressed="' + (due === calendarSelectedDay) + '"><span class="day-number">' + day + '</span>' + (total ? '<span class="day-dot"></span><span class="day-total">' + number(total) + ' venc.</span>' : '') + '</button>');
       }
       $("calendar-grid").innerHTML = cells.join("");
-      await showCalendarDay(calendarSelectedDay, requestId);
+      showCalendarDay(calendarSelectedDay, requestId);
     } catch (err) {
       if (requestId !== calendarRequest) return;
       $("calendar-grid").textContent = "Não foi possível carregar o calendário.";
@@ -218,28 +242,17 @@
       button.setAttribute("aria-pressed", String(active));
     });
     $("calendar-selected-date").textContent = new Intl.DateTimeFormat("pt-BR", {day:"numeric", month:"long", year:"numeric", timeZone:"UTC"}).format(new Date(day + "T12:00:00Z"));
-    $("calendar-selected-count").textContent = "Consultando registros…";
-    $("calendar-day-list").textContent = "Carregando contratos…";
-    $("calendar-see-all").hidden = true;
-    const params = new URLSearchParams({due_date:day, period:"all", page:"1", limit:"25"});
-    const secretaryId = $("calendar-secretary-filter").value;
-    if (secretaryId) params.set("secretary_id", secretaryId);
-    try {
-      const data = await api("/api/contracts?" + params);
-      if (requestId !== calendarRequest || day !== calendarSelectedDay || view !== "calendar") return;
-      $("calendar-selected-count").textContent = number(data.total) + " contrato(s) com vencimento registrado nesta data";
-      $("calendar-day-list").innerHTML = data.items.length ? data.items.map(c =>
+    const items = calendarDays[day] || [];
+    if (requestId !== calendarRequest || day !== calendarSelectedDay || view !== "calendar") return;
+    $("calendar-selected-count").textContent = number(items.length) + " contrato(s) com vencimento registrado nesta data";
+    $("calendar-day-list").innerHTML = items.length ? items.map(c =>
         '<article class="calendar-entry"><div class="entry-top"><strong>' + html(c.number || c.pncp_key) + '</strong>' + status(c.end_date) +
-        '</div><p>' + html(c.supplier || "Fornecedor não informado") + '</p><small>' +
+        '</div><p class="calendar-entry-object">' + html(c.object || "Objeto não informado") + '</p><small>' +
+        html(c.supplier || "Fornecedor não informado") + '</small><small>' +
         html(c.secretary || "Sem secretaria definida") + '</small><small class="calendar-entry-object">' +
-        html((c.object || "Objeto não informado").slice(0, 120)) + '</small></article>'
+        html(money(c.amount)) + '</small></article>'
       ).join("") : '<p class="muted calendar-empty">Nenhum contrato com vencimento registrado nesse dia.</p>';
-      $("calendar-see-all").hidden = data.total === 0;
-    } catch (err) {
-      if (requestId !== calendarRequest) return;
-      $("calendar-day-list").textContent = "Não foi possível consultar os vencimentos.";
-      feedback("Falha na lista do dia: " + err.message, true);
-    }
+    $("calendar-see-all").hidden = items.length === 0;
   }
 
   function showDateInContracts() {
@@ -283,6 +296,12 @@
     searchTimer = setTimeout(() => { page = 1; loadContracts(); }, 320);
   });
   ["period-filter","secretary-filter"].forEach((id) => $(id).addEventListener("change", () => { page = 1; loadContracts(); }));
+  $("procurement-search").addEventListener("input", () => {
+    clearTimeout(searchTimer);
+    searchTimer = setTimeout(() => { procurementPage = 1; loadProcurements(); }, 320);
+  });
+  $("procurement-prev").addEventListener("click", () => { if (procurementPage > 1) { procurementPage--; loadProcurements(); } });
+  $("procurement-next").addEventListener("click", () => { if (procurementPage * 25 < procurementTotal) { procurementPage++; loadProcurements(); } });
   $("prev").addEventListener("click", () => { if (page > 1) { page--; loadContracts(); } });
   $("next").addEventListener("click", () => { if (page * 25 < pageTotal) { page++; loadContracts(); } });
   $("secretary-form").addEventListener("submit", async (e) => {

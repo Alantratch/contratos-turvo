@@ -1,5 +1,5 @@
 from datetime import date
-from app.core import Base, Contract, ContractRevision, SessionLocal, engine, parse_date, upsert_contract
+from app.core import Base, Contract, ContractRevision, Procurement, SessionLocal, engine, parse_date, upsert_contract, upsert_procurement
 from app.worker import alert_threshold
 from sqlalchemy import select
 
@@ -39,6 +39,27 @@ def test_other_municipality_is_ignored():
         data = sample()
         data["orgaoEntidade"]["cnpj"] = "11111111000111"
         assert upsert_contract(db, data) == "ignored"
+
+
+def test_compras_procurement_is_stored_separately():
+    Base.metadata.create_all(engine)
+    payload = {
+        "numeroControlePNCP": "78279973000107-1-00001/2026",
+        "orgaoEntidadeCnpj": "78279973000107",
+        "numeroCompra": "90001",
+        "anoCompraPncp": 2026,
+        "sequencialCompraPncp": 1,
+        "modalidadeNome": "Pregão - Eletrônico",
+        "situacaoCompraNomePncp": "Divulgada no PNCP",
+        "objetoCompra": "Objeto da contratação",
+        "processo": "1/2026",
+        "valorTotalEstimado": 1000,
+        "dataPublicacaoPncp": "2026-01-01T10:00:00",
+    }
+    with SessionLocal() as db:
+        assert upsert_procurement(db, payload) == "inserted"
+        db.commit()
+        assert db.scalar(select(Procurement).where(Procurement.source_key == payload["numeroControlePNCP"])) is not None
 
 
 def test_dates_and_alert_levels():
@@ -109,3 +130,20 @@ def test_calendar_api_counts_dates_and_filters():
         assert client.get("/api/calendar?month=2027-13", auth=auth).status_code == 422
         assert client.get("/api/calendar?month=2027-12").status_code == 401
         assert client.get("/api/calendar?month=2027-12&secretary_id=999999", auth=auth).json()["total"] == 0
+
+
+def test_calendar_returns_all_contracts_and_objects_for_a_day():
+    from fastapi.testclient import TestClient
+    second = sample()
+    second["numeroControlePNCP"] = "78279973000107-2-00002/2026"
+    second["sequencialContrato"] = 2
+    second["objetoContrato"] = "Segundo objeto"
+    with SessionLocal() as db:
+        upsert_contract(db, sample())
+        upsert_contract(db, second)
+        db.commit()
+    with TestClient(__import__("app.main", fromlist=["app"]).app) as client:
+        data = client.get("/api/calendar?month=2026-12", auth=("test", "test-password")).json()
+    day = next(d for d in data["days"] if d["date"] == "2026-12-31")
+    assert day["count"] >= 2
+    assert {item["object"] for item in day["items"]} >= {"Objeto teste", "Segundo objeto"}
