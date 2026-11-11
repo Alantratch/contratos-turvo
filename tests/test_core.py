@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import date, timedelta
 from app.core import (
     Base, Contract, ContractRevision, ContractTerm, Procurement, Secretary, SessionLocal,
     auto_classify_contract_units, engine, parse_date, serialize_contract, upsert_contract,
@@ -148,6 +148,29 @@ def test_contract_search_matches_all_supplier_words():
         response = client.get("/api/contracts?q=IDS+SOFTWARE&period=all", auth=("test", "test-password"))
     assert response.status_code == 200
     assert response.json()["total"] >= 1
+
+
+def test_contracts_prioritize_active_records_over_expired_records():
+    from fastapi.testclient import TestClient
+    today = date.today()
+    active = sample()
+    active["numeroControlePNCP"] = "78279973000107-2-00006/2026"
+    active["nomeRazaoSocialFornecedor"] = "ORDER TEST ACTIVE"
+    active["dataVigenciaInicio"] = (today - timedelta(days=30)).isoformat()
+    active["dataVigenciaFim"] = (today + timedelta(days=30)).isoformat()
+    expired = sample()
+    expired["numeroControlePNCP"] = "78279973000107-2-00007/2026"
+    expired["nomeRazaoSocialFornecedor"] = "ORDER TEST EXPIRED"
+    expired["dataVigenciaInicio"] = (today - timedelta(days=60)).isoformat()
+    expired["dataVigenciaFim"] = (today - timedelta(days=30)).isoformat()
+    with SessionLocal() as db:
+        upsert_contract(db, active)
+        upsert_contract(db, expired)
+        db.commit()
+    with TestClient(__import__("app.main", fromlist=["app"]).app) as client:
+        response = client.get("/api/contracts?q=ORDER+TEST&period=all", auth=("test", "test-password"))
+    assert response.status_code == 200
+    assert response.json()["items"][0]["supplier"] == "ORDER TEST ACTIVE"
 
 
 def test_pncp_adapter_pagination_and_cnpj_filter():

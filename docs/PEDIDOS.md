@@ -2,6 +2,16 @@
 
 Cada solicitação de alteração deve gerar entrada rastreável, commit(s), testes e status de implantação. Commits são o histórico imutável; este registro fornece contexto e critérios de aceite. Não gravar segredos.
 
+## CT-0009 — 2026-11-11 — Priorizar contratos ativos
+
+**Pedido:** contratos encerrados não devem aparecer na frente da aba Contratos; contratos ativos precisam de maior visibilidade.
+
+**Implementação:** a API agora ordena explicitamente contratos em vigência primeiro, demais registros não encerrados em seguida, contratos sem data depois e encerrados por último. Nenhum registro foi ocultado ou excluído.
+
+**Aceite técnico:** teste automatizado de prioridade ativo versus encerrado, suíte existente verde, Compose válido e smoke test da API.
+
+**Status:** pronto para deploy.
+
 ## CT-0008 — 2026-11-11 — Logo vertical colorida
 
 **Pedido:** trocar a logo horizontal pela versão vertical colorida do Turvo.

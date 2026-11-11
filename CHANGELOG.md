@@ -1,5 +1,9 @@
 # Histórico de versões
 
+## [0.9.0] — 2026-11-11
+- Aba de contratos passa a priorizar contratos ativos e não encerrados; registros encerrados continuam acessíveis, mas ficam no final da listagem.
+- Texto da aba esclarece a ordem de prioridade e teste automatizado cobre a ordenação ativa versus encerrada.
+
 ## [0.8.0] — 2026-11-11
 - Logo institucional substituída pela versão vertical colorida do Turvo, com enquadramento próprio para a sidebar clara.
 

@@ -12,7 +12,7 @@ from urllib.parse import urlparse
 from fastapi import Depends, FastAPI, HTTPException, Query, Request
 from fastapi.responses import FileResponse, JSONResponse, Response
 from pydantic import BaseModel, Field
-from sqlalchemy import func, or_, select, text
+from sqlalchemy import and_, case, func, or_, select, text
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy.orm import selectinload
 
@@ -155,9 +155,15 @@ def contracts(
     elif period == "unknown":
         stmt = stmt.where(Contract.end_date.is_(None))
     total = session.scalar(select(func.count()).select_from(stmt.subquery())) or 0
+    priority = case(
+        (and_(Contract.start_date <= today, Contract.end_date >= today), 0),
+        (Contract.end_date >= today, 1),
+        (Contract.end_date.is_(None), 2),
+        else_=3,
+    )
     result = session.scalars(
         stmt.options(joinedload(Contract.secretary), selectinload(Contract.terms))
-        .order_by(Contract.end_date.is_(None), Contract.end_date, Contract.id)
+        .order_by(priority, Contract.end_date, Contract.id)
         .offset((page - 1) * limit).limit(limit)
     ).all()
     return {"total": total, "page": page, "items": [serialize_contract(c) for c in result]}
