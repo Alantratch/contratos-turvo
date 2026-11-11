@@ -1,9 +1,10 @@
-# Design System — Contratos Turvo (UI/UX Pro Max + Ponytail: diretrizes, não alegação de execução de tools)
+# Design System — Contratos Turvo (shadcn/ui-inspired)
 
 ## Linguagem visual
 - Produto: administrativo público, moderno, calmo, preciso, sem aparência de template genérico.
-- Azul primário `#082d53`; verde institucional `#00875a`; superfícies `#ffffff` e `#f8fafc`; cinzas de apoio e alertas semânticos.
-- Cards com borda sutil e raio entre 8–12px, grid consistente, tipografia legível, títulos com hierarquia e amplo espaço de respiro.
+- Primário quase preto `#18181b`; superfícies `#ffffff` e `#f8fafc`; cinzas neutros e cores semânticas apenas para sucesso, atenção e erro.
+- Cards com borda sutil e raio entre 7–10px, grid consistente, tipografia legível, títulos com hierarquia e amplo espaço de respiro.
+- Primitives visuais seguem a linguagem do [shadcn/ui](https://ui.shadcn.com/), mas permanecem implementados no HTML/CSS/JS já existente para evitar dependências e migração estrutural.
 - Não usar gradientes, emojis, números fictícios, textos ambíguos, efeitos que desviem da tarefa ou mais de um ícone sem significado.
 
 ## Jornadas principais
