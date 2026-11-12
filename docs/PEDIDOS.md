@@ -167,3 +167,5 @@ Cada solicitação de alteração deve gerar entrada rastreável, commit(s), tes
 **Aceite técnico:** testes para CNPJ válido/malformado, snapshot de termo, payload parcial, paginação Equiplano acima da primeira página, retries/204 do Compras.gov, compilação, suíte automatizada e smoke no Coolify.
 
 **Status:** implementado na branch `fix/CT-0015-integridade-sincronizacao`; aguardando deploy.
+
+**Commit:** `dfb1460` — `fix(sync): [CT-0015] harden partial source synchronization`.
