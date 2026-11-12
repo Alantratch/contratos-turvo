@@ -86,6 +86,8 @@
       if ($("overview-clear-filters")) $("overview-clear-filters").hidden = !secretaryId && windowDays === "60";
       if ($("secretary-chart-lead")) $("secretary-chart-lead").textContent = "Distribuição por área nos próximos " + windowDays + " dias";
       if ($("upcoming-lead")) $("upcoming-lead").textContent = "Contratos que vencem nos próximos " + windowDays + " dias";
+      const upcomingTitle = $("stat-upcoming")?.closest(".metric-card")?.querySelector(".metric-top span");
+      if (upcomingTitle) upcomingTitle.textContent = "Vencem em " + windowDays + " dias";
       const s = await api("/api/summary?" + summaryParams);
       $("stat-all").textContent = number(s.all);
       $("stat-active").textContent = number(s.active);

@@ -660,9 +660,17 @@ def test_summary_accepts_secretary_and_window_filters_and_returns_by_window():
         assert buckets_a["60"] == 1
         assert buckets_a["90"] == 0
 
+        filtered_60 = client.get(f"/api/summary?secretary_id={area_a_id}&window=60", auth=auth).json()
+        assert filtered_60["window"] == 60
+        assert filtered_60["upcoming"] == 2
+        assert filtered_60["by_secretary"] == [{"id": area_a_id, "name": "SECRETARIA DASHBOARD A", "count": 2}]
+
         filtered_90 = client.get(f"/api/summary?secretary_id={area_b_id}&window=90", auth=auth).json()
+        assert filtered_90["window"] == 90
+        assert filtered_90["upcoming"] == 1
         assert filtered_90["by_secretary"] == [{"id": area_b_id, "name": "SECRETARIA DASHBOARD B", "count": 1}]
         buckets_b = {b["key"]: b["count"] for b in filtered_90["by_window"]}
+        assert buckets_b["30"] == 0
         assert buckets_b["90"] == 1
 
         assert client.get("/api/summary?window=45", auth=auth).status_code == 422

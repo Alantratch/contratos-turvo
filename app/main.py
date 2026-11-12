@@ -104,7 +104,10 @@ def summary(
     scope = [Contract.secretary_id == secretary_id] if secretary_id is not None else []
     all_contracts = session.scalar(select(func.count()).select_from(Contract).where(*scope)) or 0
     active = session.scalar(select(func.count()).select_from(Contract).where(*scope, Contract.end_date >= today, Contract.start_date <= today)) or 0
-    upcoming = session.scalar(select(func.count()).select_from(Contract).where(*scope, Contract.end_date.between(today, today + timedelta(days=30)))) or 0
+    due_30 = session.scalar(select(func.count()).select_from(Contract).where(*scope, Contract.end_date.between(today, today + timedelta(days=30)))) or 0
+    upcoming = due_30 if window_days == 30 else (
+        session.scalar(select(func.count()).select_from(Contract).where(*scope, Contract.end_date.between(today, today + timedelta(days=window_days)))) or 0
+    )
     due_60 = session.scalar(select(func.count()).select_from(Contract).where(*scope, Contract.end_date.between(today + timedelta(days=31), today + timedelta(days=60)))) or 0
     due_90 = session.scalar(select(func.count()).select_from(Contract).where(*scope, Contract.end_date.between(today + timedelta(days=61), today + timedelta(days=90)))) or 0
     active_later = session.scalar(select(func.count()).select_from(Contract).where(*scope, Contract.end_date > today + timedelta(days=90))) or 0
@@ -129,7 +132,7 @@ def summary(
         "secretary_id": secretary_id,
         "by_secretary": [{"id": sid, "name": n, "count": count} for sid, n, count in groups],
         "by_window": [
-            {"key": "30", "label": "Até 30 dias", "count": upcoming},
+            {"key": "30", "label": "Até 30 dias", "count": due_30},
             {"key": "60", "label": "31 a 60 dias", "count": due_60},
             {"key": "90", "label": "61 a 90 dias", "count": due_90},
             {"key": "active", "label": "Acima de 90 dias", "count": active_later},
