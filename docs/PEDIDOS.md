@@ -139,3 +139,9 @@ Cada solicitação de alteração deve gerar entrada rastreável, commit(s), tes
 **Limitação conhecida:** o certificado público do Equiplano entrega cadeia incompleta no momento; `EQUIPLANO_VERIFY_TLS=false` é explícito e deve voltar a `true` quando o provedor corrigir a cadeia. A origem é pública e não recebe credenciais.
 
 **Aceite técnico:** backfill temporário validado com parser real, 13 testes automatizados verdes, alertas de e-mail desligados e nenhum serviço/banco existente removido.
+
+## CT-0013 — Revisão responsiva por módulo
+
+- **Solicitação:** revisar a visualização no celular e corrigir bugs de design em todos os módulos.
+- **Implementado:** menu móvel com fechamento por fundo, tabelas transformadas em cartões legíveis em telas estreitas, filtros e paginação reorganizados, catálogo de licitações sem rolagem horizontal interna e preservação do calendário como grade compacta com painel de detalhes.
+- **Validação:** viewport de 390 px em produção, sem overflow horizontal no documento; módulos de visão geral, contratos, contratações, licitações, calendário, secretarias e sincronização conferidos.

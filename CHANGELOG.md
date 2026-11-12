@@ -1,5 +1,10 @@
 # Histórico de versões
 
+## [0.12.1] — 2026-11-12
+- Revisão responsiva por módulo para telas de celular.
+- Tabelas de contratos, contratações, licitações e sincronização viram cartões empilhados, sem rolagem horizontal interna.
+- Menu móvel ganhou fundo de fechamento e os controles de calendário mantêm leitura e toque adequados em telas estreitas.
+
 ## [0.12.0] — 2026-11-11
 - Catálogo anual de licitações pela rota `GET /api/licitacoes?year=YYYY`, preservando registros sem data de abertura.
 - Clique em evento ou linha do catálogo abre modal com objeto, datas, valores, situação, contrato e links oficiais.

@@ -472,6 +472,10 @@
     const opened = document.querySelector(".app-shell").classList.toggle("menu-open");
     $("menu-toggle").setAttribute("aria-expanded", String(opened));
   });
+  $("mobile-menu-backdrop").addEventListener("click", () => {
+    document.querySelector(".app-shell").classList.remove("menu-open");
+    $("menu-toggle").setAttribute("aria-expanded", "false");
+  });
   $("refresh").addEventListener("click", () => { loadSummary(); });
   $("refresh-sync").addEventListener("click", loadSync);
   $("calendar-prev").addEventListener("click", () => calendarMonthShift(-1));

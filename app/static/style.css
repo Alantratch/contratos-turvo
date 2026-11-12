@@ -407,3 +407,65 @@ td small { display: block; margin-top: 3px; color: var(--muted); font-size: 11px
   .modal-contract { align-items: flex-start; flex-direction: column; gap: 3px; }
   .modal-contract span { text-align: left; }
 }
+
+/* Mobile uses readable record cards instead of forcing wide tables into a horizontal scroller. */
+.mobile-menu-backdrop { display: none; }
+
+@media (max-width: 820px) {
+  .mobile-menu-backdrop { position: fixed; z-index: 19; inset: 0; border: 0; background: rgba(24, 24, 27, .38); }
+  .app-shell.menu-open .mobile-menu-backdrop { display: block; }
+  .sidebar { z-index: 20; }
+}
+
+@media (max-width: 680px) {
+  .page-header h1 { font-size: 26px; }
+  .card-heading { gap: 10px; }
+  .card-heading .badge, .card-heading .count-badge { flex: 0 0 auto; }
+  .table-scroll { overflow: visible; }
+  .table-scroll table { display: block; }
+  .table-scroll thead { display: none; }
+  .table-scroll tbody { display: grid; gap: 10px; padding: 12px; }
+  .table-scroll tbody tr { display: grid; gap: 10px; padding: 12px; border: 1px solid var(--border); border-radius: 10px; background: #fff; box-shadow: 0 1px 2px rgba(24, 24, 27, .03); }
+  .table-scroll tbody tr:has(td.empty) { display: block; padding: 0; border: 0; box-shadow: none; }
+  .table-scroll tbody tr:has(td.empty) td { display: block; padding: 24px 8px; }
+  .table-scroll tbody tr:has(td.empty) td::before { display: none; }
+  .table-scroll tbody td { display: grid; grid-template-columns: 82px minmax(0, 1fr); gap: 8px; width: 100%; min-width: 0; padding: 0; border: 0; font-size: 12px; overflow-wrap: anywhere; }
+  .table-scroll tbody td::before { color: var(--muted); font-size: 9px; font-weight: 800; letter-spacing: .07em; line-height: 1.35; text-transform: uppercase; }
+  .table-scroll tbody td > * { min-width: 0; }
+  .table-scroll tbody td strong, .table-scroll tbody td a, .table-scroll tbody td span { overflow-wrap: anywhere; }
+  .assign-select { width: 100%; min-width: 0; max-width: none; }
+  .pagination { flex-wrap: wrap; padding: 12px; }
+  .pagination > div { width: 100%; }
+  .pagination .button { flex: 1; }
+  .licitacao-catalog-scroll { max-height: none; overflow: visible; }
+  .calendar-summary > span:last-child { white-space: normal; flex-wrap: wrap; }
+
+  #upcoming-body td:nth-child(1)::before { content: "Contrato"; }
+  #upcoming-body td:nth-child(2)::before { content: "Fornecedor"; }
+  #upcoming-body td:nth-child(3)::before { content: "Área"; }
+  #upcoming-body td:nth-child(4)::before { content: "Vencimento"; }
+  #upcoming-body td:nth-child(5)::before { content: "Prazo"; }
+
+  #contracts-body td:nth-child(1)::before { content: "Contrato"; }
+  #contracts-body td:nth-child(2)::before { content: "Objeto / fornecedor"; }
+  #contracts-body td:nth-child(3)::before { content: "Área"; }
+  #contracts-body td:nth-child(4)::before { content: "Vigência"; }
+  #contracts-body td:nth-child(5)::before { content: "Fonte"; }
+
+  #procurements-body td:nth-child(1)::before { content: "Compra"; }
+  #procurements-body td:nth-child(2)::before { content: "Modalidade"; }
+  #procurements-body td:nth-child(3)::before { content: "Objeto"; }
+  #procurements-body td:nth-child(4)::before { content: "Valores"; }
+  #procurements-body td:nth-child(5)::before { content: "Publicação"; }
+
+  #licitacao-catalog-body td:nth-child(1)::before { content: "Licitação"; }
+  #licitacao-catalog-body td:nth-child(2)::before { content: "Modalidade"; }
+  #licitacao-catalog-body td:nth-child(3)::before { content: "Objeto"; }
+  #licitacao-catalog-body td:nth-child(4)::before { content: "Etapa"; }
+  #licitacao-catalog-body td:nth-child(5)::before { content: "Contrato"; }
+
+  #sync-body td:nth-child(1)::before { content: "Rotina"; }
+  #sync-body td:nth-child(2)::before { content: "Início"; }
+  #sync-body td:nth-child(3)::before { content: "Processados"; }
+  #sync-body td:nth-child(4)::before { content: "Estado"; }
+}
