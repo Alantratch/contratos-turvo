@@ -374,15 +374,19 @@ def sync_equiplano():
                             continue
                         sequence = int(row[2].get("text") or 0)
                         start_date, end_date = equiplano_date_range(row[6].get("text", ""))
+                        term_type_name = row[3].get("text", "") + (" / " + row[5].get("text", "") if row[5].get("text") else "")
+                        normalized_term_type = term_type_name.casefold()
                         term = {
                             "sequencialTermoContrato": sequence,
                             "numeroTermoContrato": row[2].get("text", ""),
-                            "tipoTermoContrato": {"nome": row[3].get("text", "") + (" / " + row[5].get("text", "") if row[5].get("text") else "")},
+                            "tipoTermoContrato": {"nome": term_type_name},
                             "objetoTermoContrato": parent.object,
                             "dataVigenciaInicio": start_date.isoformat() if start_date else None,
                             "dataVigenciaFim": end_date.isoformat() if end_date else None,
                             "valorGlobal": equiplano_amount(row[9].get("text", "")),
-                            "excluido": row[3].get("text", "").casefold() == "anulação",
+                            "qualificacaoAcrescimoSupressao": "valor" in normalized_term_type,
+                            "qualificacaoVigencia": "prazo" in normalized_term_type,
+                            "excluido": "anula" in normalized_term_type,
                             "fonte": "Portal de Transparência / Equiplano",
                             "fonteUrl": EQUIPLANO_BASE + "/transparencia/contratos",
                             "equiplano": {"row": row},

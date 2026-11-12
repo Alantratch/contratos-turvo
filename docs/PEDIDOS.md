@@ -150,9 +150,9 @@ Cada solicitação de alteração deve gerar entrada rastreável, commit(s), tes
 
 **Pedido:** corrigir contratos cuja vigência publicada foi alterada por aditivos e evitar que contratos encerrados ocupem a visão inicial do acervo, sem apagar o histórico.
 
-**Escopo:** recalcular a vigência desde os campos do contrato-base e reaplicar somente termos não excluídos, incluindo reversão quando o último termo for anulado/excluído; adicionar filtro explícito de contratos em vigência e deixar essa visão como padrão da interface. Os filtros `Todos` e `Encerrados` continuam disponíveis para consulta histórica.
+**Escopo:** recalcular a vigência desde os campos do contrato-base e reaplicar somente termos não excluídos, inclusive após atualização do contrato-base, incluindo reversão quando o último termo for anulado/excluído; preservar campos em atualizações parciais e interpretar booleanos/qualificações da fonte; adicionar filtro explícito de contratos em vigência e deixar essa visão como padrão da interface. Os filtros `Todos` e `Encerrados` continuam disponíveis para consulta histórica.
 
-**Aceite técnico:** teste de recomputação após exclusão de termo, filtro API `active`, JavaScript/Python válidos, suíte automatizada executada quando as dependências estiverem disponíveis e smoke test no Coolify após revisão.
+**Aceite técnico:** testes de recomputação após exclusão e atualização do contrato-base, atualização parcial de termo, booleanos textuais e qualificações de vigência/valor; filtro API `active`, JavaScript/Python válidos, suíte automatizada executada quando as dependências estiverem disponíveis e smoke test no Coolify após revisão.
 
 **Status:** implementado na branch `fix/CT-0014-vigencia-efetiva-acervo`; aguardando revisão e deploy.
 

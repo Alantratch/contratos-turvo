@@ -87,6 +87,61 @@ def test_effective_fields_revert_to_base_when_latest_term_is_excluded():
         assert contract.end_date == date(2026, 12, 31)
 
 
+def test_contract_update_reapplies_active_term_after_reload():
+    Base.metadata.create_all(engine)
+    with SessionLocal() as db:
+        payload = sample()
+        payload["numeroControlePNCP"] = "78279973000107-2-00003/2026"
+        upsert_contract(db, payload)
+        contract = db.scalar(select(Contract).where(Contract.pncp_key == payload["numeroControlePNCP"]))
+        upsert_contract_term(db, contract, {
+            "sequencialTermoContrato": 1,
+            "dataVigenciaFim": "2027-06-30",
+            "valorGlobal": 150.25,
+            "qualificacaoVigencia": True,
+            "qualificacaoAcrescimoSupressao": True,
+        })
+        db.commit()
+
+        updated = dict(payload, objetoContrato="Objeto atualizado")
+        assert upsert_contract(db, updated) == "updated"
+        db.commit()
+
+        stored = db.scalar(select(Contract).where(Contract.pncp_key == payload["numeroControlePNCP"]))
+        assert stored.end_date == date(2027, 6, 30)
+        assert stored.amount == 150.25
+
+
+def test_partial_term_update_preserves_fields_and_parses_boolean_strings():
+    Base.metadata.create_all(engine)
+    with SessionLocal() as db:
+        payload = sample()
+        payload["numeroControlePNCP"] = "78279973000107-2-00004/2026"
+        upsert_contract(db, payload)
+        contract = db.scalar(select(Contract).where(Contract.pncp_key == payload["numeroControlePNCP"]))
+        upsert_contract_term(db, contract, {
+            "sequencialTermoContrato": 1,
+            "dataVigenciaFim": "2027-06-30",
+            "valorGlobal": 150.25,
+            "qualificacaoVigencia": True,
+            "qualificacaoAcrescimoSupressao": True,
+        })
+        assert upsert_contract_term(db, contract, {
+            "sequencialTermoContrato": 1,
+            "qualificacaoVigencia": "false",
+            "excluido": "false",
+        }) == "updated"
+        db.commit()
+
+        term = db.scalar(select(ContractTerm).where(ContractTerm.term_key == f"{payload['numeroControlePNCP']}#termo-1"))
+        stored = db.scalar(select(Contract).where(Contract.pncp_key == payload["numeroControlePNCP"]))
+        assert term.end_date == date(2027, 6, 30)
+        assert term.excluded is False
+        assert term.qualifies_duration is False
+        assert stored.end_date == date(2026, 12, 31)
+        assert stored.amount == 150.25
+
+
 def test_other_municipality_is_ignored():
     with SessionLocal() as db:
         data = sample()
@@ -338,6 +393,7 @@ def test_calendar_api_counts_dates_and_filters():
     from app.main import app
     from app.core import Secretary
     payload = sample()
+    payload["numeroControlePNCP"] = "78279973000107-2-00015/2026"
     payload["dataVigenciaFim"] = "2027-12-31"
     with SessionLocal() as db:
         upsert_contract(db, payload)

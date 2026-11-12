@@ -231,6 +231,22 @@ def parse_int(value) -> int | None:
         return None
 
 
+def parse_bool(value, default: bool = False) -> bool:
+    if value is None:
+        return default
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, (int, float)):
+        return bool(value)
+    if isinstance(value, str):
+        normalized = value.strip().casefold()
+        if normalized in {"true", "1", "sim", "yes"}:
+            return True
+        if normalized in {"false", "0", "nao", "não", "no", ""}:
+            return False
+    return default
+
+
 def upsert_contract(session: Session, payload: dict) -> str:
     """Importa somente o CNPJ-alvo. Preserva secretaria e snapshots em alterações."""
     if not isinstance(payload, dict):
@@ -246,6 +262,7 @@ def upsert_contract(session: Session, payload: dict) -> str:
     current = session.scalar(select(Contract).where(Contract.pncp_key == key))
     if current and current.digest == digest:
         current.last_seen_at = utcnow()
+        refresh_contract_effective_fields(current)
         return "unchanged"
 
     unit = raw.get("unidadeOrgao") or {}
@@ -274,6 +291,7 @@ def upsert_contract(session: Session, payload: dict) -> str:
         for column, value in fields.items():
             setattr(current, column, value)
     session.flush()
+    refresh_contract_effective_fields(current)
     session.add(ContractRevision(contract_id=current.id, digest=digest, raw=raw))
     return status
 
@@ -284,11 +302,16 @@ def refresh_contract_effective_fields(contract: Contract) -> None:
     contract.start_date = parse_date(raw.get("dataVigenciaInicio"))
     contract.end_date = parse_date(raw.get("dataVigenciaFim"))
     contract.amount = parse_amount(raw.get("valorGlobal"))
-    for term in sorted((term for term in contract.terms if not term.excluded), key=lambda item: (item.sequence, item.published_at or date.min)):
-        if term.start_date:
-            contract.start_date = term.start_date
-        if term.end_date:
-            contract.end_date = term.end_date
+    active_terms = sorted(
+        (term for term in contract.terms if not term.excluded),
+        key=lambda item: (item.sequence, item.published_at or date.min),
+    )
+    for term in active_terms:
+        if term.qualifies_duration is not False:
+            if term.start_date:
+                contract.start_date = term.start_date
+            if term.end_date:
+                contract.end_date = term.end_date
         if term.global_amount is not None and term.qualifies_amount:
             contract.amount = term.global_amount
 
@@ -300,33 +323,49 @@ def upsert_contract_term(session: Session, contract: Contract, payload: dict) ->
     sequence = parse_int(payload.get("sequencialTermoContrato"))
     if sequence is None:
         return "ignored"
-    raw = json.loads(json.dumps(payload, ensure_ascii=False, default=str))
-    digest = hashlib.sha256(json.dumps(raw, sort_keys=True, ensure_ascii=False).encode()).hexdigest()
     key = f"{contract.pncp_key}#termo-{sequence}"
     current = session.scalar(select(ContractTerm).where(ContractTerm.term_key == key))
+    raw = json.loads(json.dumps(payload, ensure_ascii=False, default=str))
+    merged_raw = dict(current.raw or {}) if current and isinstance(current.raw, dict) else {}
+    merged_raw.update(raw)
+    digest = hashlib.sha256(json.dumps(merged_raw, sort_keys=True, ensure_ascii=False).encode()).hexdigest()
     if current and current.digest == digest:
         current.last_seen_at = utcnow()
         return "unchanged"
     term_type = raw.get("tipoTermoContrato") or {}
+    previous = current
+
+    def value(key: str, parsed, fallback=None):
+        return parsed if key in raw else fallback
+
+    type_id = previous.type_id if previous else None
+    type_name = previous.type_name if previous else ""
+    if "tipoTermoContratoId" in raw:
+        type_id = parse_int(raw.get("tipoTermoContratoId"))
+    if isinstance(term_type, dict):
+        if "id" in term_type:
+            type_id = parse_int(term_type.get("id"))
+        if "nome" in term_type:
+            type_name = str(term_type.get("nome") or "")[:120]
     fields = {
         "contract_id": contract.id,
         "sequence": sequence,
-        "number": str(raw.get("numeroTermoContrato") or "")[:70],
-        "type_id": parse_int(term_type.get("id") if isinstance(term_type, dict) else raw.get("tipoTermoContratoId")),
-        "type_name": str(term_type.get("nome") if isinstance(term_type, dict) else "")[:120],
-        "object": str(raw.get("objetoTermoContrato") or ""),
-        "signed_date": parse_date(raw.get("dataAssinatura")),
-        "start_date": parse_date(raw.get("dataVigenciaInicio")),
-        "end_date": parse_date(raw.get("dataVigenciaFim")),
-        "published_at": parse_date(raw.get("dataPublicacaoPncp")),
-        "amount_added": parse_amount(raw.get("valorAcrescido")),
-        "global_amount": parse_amount(raw.get("valorGlobal")),
-        "deadline_days": parse_int(raw.get("prazoAditadoDias")),
-        "qualifies_amount": bool(raw.get("qualificacaoAcrescimoSupressao")),
-        "qualifies_duration": bool(raw.get("qualificacaoVigencia")),
-        "excluded": bool(raw.get("excluido")),
+        "number": value("numeroTermoContrato", str(raw.get("numeroTermoContrato") or "")[:70], previous.number if previous else ""),
+        "type_id": type_id,
+        "type_name": type_name,
+        "object": value("objetoTermoContrato", str(raw.get("objetoTermoContrato") or ""), previous.object if previous else ""),
+        "signed_date": value("dataAssinatura", parse_date(raw.get("dataAssinatura")), previous.signed_date if previous else None),
+        "start_date": value("dataVigenciaInicio", parse_date(raw.get("dataVigenciaInicio")), previous.start_date if previous else None),
+        "end_date": value("dataVigenciaFim", parse_date(raw.get("dataVigenciaFim")), previous.end_date if previous else None),
+        "published_at": value("dataPublicacaoPncp", parse_date(raw.get("dataPublicacaoPncp")), previous.published_at if previous else None),
+        "amount_added": value("valorAcrescido", parse_amount(raw.get("valorAcrescido")), previous.amount_added if previous else None),
+        "global_amount": value("valorGlobal", parse_amount(raw.get("valorGlobal")), previous.global_amount if previous else None),
+        "deadline_days": value("prazoAditadoDias", parse_int(raw.get("prazoAditadoDias")), previous.deadline_days if previous else None),
+        "qualifies_amount": parse_bool(raw.get("qualificacaoAcrescimoSupressao"), previous.qualifies_amount if previous else False) if "qualificacaoAcrescimoSupressao" in raw else (previous.qualifies_amount if previous else False),
+        "qualifies_duration": parse_bool(raw.get("qualificacaoVigencia"), previous.qualifies_duration if previous else False) if "qualificacaoVigencia" in raw else (previous.qualifies_duration if previous else False),
+        "excluded": parse_bool(raw.get("excluido"), previous.excluded if previous else False) if "excluido" in raw else (previous.excluded if previous else False),
         "digest": digest,
-        "raw": raw,
+        "raw": merged_raw,
         "last_seen_at": utcnow(),
     }
     status = "updated" if current else "inserted"

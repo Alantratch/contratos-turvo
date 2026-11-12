@@ -2,6 +2,7 @@
 
 ## [0.12.2] — 2026-11-12
 - Recalculo da vigência efetiva desde o contrato-base e termos não excluídos, evitando datas stale após aditivos ou anulações.
+- Atualizações da base reaplicam termos ativos, preservam termos parciais e interpretam qualificações/booleanos da fonte.
 - Filtro `Em vigência` como visão inicial do acervo; contratos históricos continuam acessíveis em `Todos` e `Encerrados`.
 
 ## [0.12.1] — 2026-11-12
