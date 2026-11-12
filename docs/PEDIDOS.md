@@ -154,4 +154,6 @@ Cada solicitação de alteração deve gerar entrada rastreável, commit(s), tes
 
 **Aceite técnico:** teste de recomputação após exclusão de termo, filtro API `active`, JavaScript/Python válidos, suíte automatizada executada quando as dependências estiverem disponíveis e smoke test no Coolify após revisão.
 
-**Status:** em implementação na branch `fix/CT-0014-vigencia-efetiva-acervo`.
+**Status:** implementado na branch `fix/CT-0014-vigencia-efetiva-acervo`; aguardando revisão e deploy.
+
+**Commit:** `49077ec` — `fix(contracts): [CT-0014] recalculate effective validity`.
