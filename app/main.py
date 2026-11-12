@@ -96,17 +96,18 @@ def assets(name: str):
 @app.get("/api/summary")
 def summary(
     secretary_id: int | None = Query(None, ge=1),
-    window: str = Query("60", pattern="^(30|60|90)$"),
+    window: str | None = Query(None, pattern="^(30|60|90)$"),
     session: Session = Depends(db),
 ):
     today = date.today()
-    window_days = int(window)
+    window_days = int(window) if window else 60
+    upcoming_days = int(window) if window else 30
     scope = [Contract.secretary_id == secretary_id] if secretary_id is not None else []
     all_contracts = session.scalar(select(func.count()).select_from(Contract).where(*scope)) or 0
     active = session.scalar(select(func.count()).select_from(Contract).where(*scope, Contract.end_date >= today, Contract.start_date <= today)) or 0
     due_30 = session.scalar(select(func.count()).select_from(Contract).where(*scope, Contract.end_date.between(today, today + timedelta(days=30)))) or 0
-    upcoming = due_30 if window_days == 30 else (
-        session.scalar(select(func.count()).select_from(Contract).where(*scope, Contract.end_date.between(today, today + timedelta(days=window_days)))) or 0
+    upcoming = due_30 if upcoming_days == 30 else (
+        session.scalar(select(func.count()).select_from(Contract).where(*scope, Contract.end_date.between(today, today + timedelta(days=upcoming_days)))) or 0
     )
     due_60 = session.scalar(select(func.count()).select_from(Contract).where(*scope, Contract.end_date.between(today + timedelta(days=31), today + timedelta(days=60)))) or 0
     due_90 = session.scalar(select(func.count()).select_from(Contract).where(*scope, Contract.end_date.between(today + timedelta(days=61), today + timedelta(days=90)))) or 0
