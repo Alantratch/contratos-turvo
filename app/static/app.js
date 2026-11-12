@@ -24,6 +24,14 @@
   let licitacaoRequest = 0;
 
   const html = (text) => String(text ?? "").replace(/[&<>"']/g, (c) => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+  function safeHttpUrl(value) {
+    try {
+      const url = new URL(String(value ?? ""));
+      return url.protocol === "http:" || url.protocol === "https:" ? url.href : "";
+    } catch (_) {
+      return "";
+    }
+  }
   const date = (s) => s ? new Intl.DateTimeFormat("pt-BR", {timeZone:"UTC"}).format(new Date(s + "T12:00:00Z")) : "Não informada";
   const number = (n) => new Intl.NumberFormat("pt-BR").format(n ?? 0);
   const money = (n) => n == null ? "Valor não informado" : new Intl.NumberFormat("pt-BR",{style:"currency",currency:"BRL"}).format(Number(n));
@@ -327,7 +335,8 @@
   function openLicitacaoModal(item) {
     if (!item) return;
     const pncpLink = /^\d{14}$/.test(item.buyer_cnpj || "") && Number.isInteger(item.year) && Number.isInteger(item.sequence) ? '<a class="button button-secondary" target="_blank" rel="noopener noreferrer" href="https://pncp.gov.br/app/editais/' + item.buyer_cnpj + '/' + item.year + '/' + item.sequence + '">Abrir no PNCP ↗</a>' : "";
-    const infoLink = item.impugnation_url ? '<a class="button button-secondary" target="_blank" rel="noopener noreferrer" href="' + html(item.impugnation_url) + '">Quadro de impugnações ↗</a>' : '<span class="modal-note">Impugnação: ' + html(item.impugnation_status) + '</span>';
+    const infoUrl = safeHttpUrl(item.impugnation_url);
+    const infoLink = infoUrl ? '<a class="button button-secondary" target="_blank" rel="noopener noreferrer" href="' + html(infoUrl) + '">Quadro de impugnações ↗</a>' : '<span class="modal-note">Impugnação: ' + html(item.impugnation_status) + '</span>';
     const contracts = (item.contracts || []).length ? item.contracts.map((contract) => '<div class="modal-contract"><strong>Contrato ' + html(contract.number || contract.pncp_key) + '</strong><span>' + html(contract.supplier || "Fornecedor não informado") + (contract.end_date ? ' · vence ' + date(contract.end_date) : '') + '</span></div>').join("") : '<span class="modal-note">' + html(item.contract_status) + '</span>';
     $("licitacao-modal-title").textContent = "Licitação " + (item.number || item.source_key);
     $("licitacao-modal-subtitle").textContent = (item.modality || "Modalidade não informada") + " · " + date(item.opening_date);

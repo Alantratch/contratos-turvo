@@ -179,3 +179,13 @@ Cada solicitação de alteração deve gerar entrada rastreável, commit(s), tes
 **Aceite técnico:** testes automatizados para `/api/summary` padrão, filtrado por `secretary_id` e `window` (`30`/`60`/`90`) e validação `422` para janela inválida; `compileall`, `node --check app/static/app.js`, `pytest` e `git diff --check` verdes.
 
 **Status:** implementado na branch `feat/CT-0017-dashboard-filtros-graficos`; não implantado no Coolify (aguardando revisão e deploy autorizado).
+
+## CT-0018 — 2026-11-12 — Validar URL do quadro de impugnações
+
+**Pedido:** corrigir o risco de navegação insegura na montagem do `href` de `item.impugnation_url` no módulo de licitações.
+
+**Escopo:** validar a URL no ponto de uso do DOM, aceitando somente esquemas `http:` e `https:`; manter o link e seus hooks para URLs válidas; rejeitar `javascript:`, `data:`, esquemas ausentes e URLs inválidas, exibindo somente o estado de impugnação sem link. Preservar endpoints, API, modelo, layout e o link PNCP.
+
+**Aceite técnico:** teste estático JavaScript, teste funcional para URLs válidas e inválidas, `compileall`, `node --check app/static/app.js`, `pytest` e `git diff --check` verdes; sem deploy.
+
+**Status:** implementado na branch `fix/CT-0018-validar-url-impugnacao`, baseado no HEAD `c2c655b` do CT-0017; não implantado.
