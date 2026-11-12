@@ -112,8 +112,8 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px s
 .chart-track { display: block; height: 7px; overflow: hidden; border-radius: 99px; background: #f4f4f5; }
 .chart-fill { display: block; height: 100%; border-radius: inherit; background: #18181b; }
 .chart-fill.is-30 { background: var(--red); }
-.chart-fill.is-60, .chart-fill.is-90 { background: var(--amber); }
-.chart-fill.is-active { background: var(--green); }
+.chart-fill.is-60, .chart-fill.is-90, .chart-fill.is-31-60, .chart-fill.is-61-90 { background: var(--amber); }
+.chart-fill.is-active, .chart-fill.is-later { background: var(--green); }
 .chart-fill.is-expired, .chart-fill.is-unknown { background: var(--subtle); }
 .overview-filter-card { margin-bottom: 18px; padding: 0; }
 .overview-filter-bar { border-bottom: 0; }

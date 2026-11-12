@@ -635,6 +635,13 @@ def test_summary_accepts_secretary_and_window_filters_and_returns_by_window():
         upsert_contract(db, c90)
         db.scalar(select(Contract).where(Contract.pncp_key == c90["numeroControlePNCP"])).secretary_id = area_b.id
 
+        clater = sample()
+        clater["numeroControlePNCP"] = "78279973000107-2-00074/2026"
+        clater["dataVigenciaInicio"] = (today - timedelta(days=10)).isoformat()
+        clater["dataVigenciaFim"] = (today + timedelta(days=120)).isoformat()
+        upsert_contract(db, clater)
+        db.scalar(select(Contract).where(Contract.pncp_key == clater["numeroControlePNCP"])).secretary_id = area_b.id
+
         area_a_id = area_a.id
         area_b_id = area_b.id
         db.commit()
@@ -646,7 +653,7 @@ def test_summary_accepts_secretary_and_window_filters_and_returns_by_window():
         default_data = default_res.json()
         assert default_data["window"] == 60
         assert isinstance(default_data["by_window"], list)
-        assert {b["key"] for b in default_data["by_window"]} == {"30", "60", "90", "active", "expired", "unknown"}
+        assert {b["key"] for b in default_data["by_window"]} == {"30", "31-60", "61-90", "later", "expired", "unknown"}
 
         filtered_30 = client.get(f"/api/summary?secretary_id={area_a_id}&window=30", auth=auth).json()
         assert filtered_30["secretary_id"] == area_a_id
@@ -657,8 +664,8 @@ def test_summary_accepts_secretary_and_window_filters_and_returns_by_window():
         assert filtered_30["by_secretary"] == [{"id": area_a_id, "name": "SECRETARIA DASHBOARD A", "count": 1}]
         buckets_a = {b["key"]: b["count"] for b in filtered_30["by_window"]}
         assert buckets_a["30"] == 1
-        assert buckets_a["60"] == 1
-        assert buckets_a["90"] == 0
+        assert buckets_a["31-60"] == 1
+        assert buckets_a["61-90"] == 0
 
         filtered_60 = client.get(f"/api/summary?secretary_id={area_a_id}&window=60", auth=auth).json()
         assert filtered_60["window"] == 60
@@ -671,6 +678,14 @@ def test_summary_accepts_secretary_and_window_filters_and_returns_by_window():
         assert filtered_90["by_secretary"] == [{"id": area_b_id, "name": "SECRETARIA DASHBOARD B", "count": 1}]
         buckets_b = {b["key"]: b["count"] for b in filtered_90["by_window"]}
         assert buckets_b["30"] == 0
-        assert buckets_b["90"] == 1
+        assert buckets_b["61-90"] == 1
+        assert buckets_b["later"] == 1
+
+        list_31_60 = client.get(f"/api/contracts?secretary_id={area_a_id}&period=31-60", auth=auth).json()
+        assert [c["pncp_key"] for c in list_31_60["items"]] == [c60["numeroControlePNCP"]]
+        list_61_90 = client.get(f"/api/contracts?secretary_id={area_b_id}&period=61-90", auth=auth).json()
+        assert [c["pncp_key"] for c in list_61_90["items"]] == [c90["numeroControlePNCP"]]
+        list_later = client.get(f"/api/contracts?secretary_id={area_b_id}&period=later", auth=auth).json()
+        assert [c["pncp_key"] for c in list_later["items"]] == [clater["numeroControlePNCP"]]
 
         assert client.get("/api/summary?window=45", auth=auth).status_code == 422

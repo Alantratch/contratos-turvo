@@ -133,9 +133,9 @@ def summary(
         "by_secretary": [{"id": sid, "name": n, "count": count} for sid, n, count in groups],
         "by_window": [
             {"key": "30", "label": "Até 30 dias", "count": due_30},
-            {"key": "60", "label": "31 a 60 dias", "count": due_60},
-            {"key": "90", "label": "61 a 90 dias", "count": due_90},
-            {"key": "active", "label": "Acima de 90 dias", "count": active_later},
+            {"key": "31-60", "label": "31 a 60 dias", "count": due_60},
+            {"key": "61-90", "label": "61 a 90 dias", "count": due_90},
+            {"key": "later", "label": "Acima de 90 dias", "count": active_later},
             {"key": "expired", "label": "Encerrados", "count": expired},
             {"key": "unknown", "label": "Sem data", "count": unknown},
         ],
@@ -154,7 +154,7 @@ def contracts(
     limit: int = Query(25, ge=1, le=100),
     secretary_id: int | None = Query(None, ge=1),
     due_date: date | None = None,
-    period: str = Query("all", pattern="^(all|active|30|60|90|expired|unknown)$"),
+    period: str = Query("all", pattern="^(all|active|30|60|90|31-60|61-90|later|expired|unknown)$"),
     session: Session = Depends(db),
 ):
     today = date.today()
@@ -175,6 +175,12 @@ def contracts(
         stmt = stmt.where(Contract.start_date <= today, Contract.end_date >= today)
     elif period in ("30", "60", "90"):
         stmt = stmt.where(Contract.end_date.between(today, today + timedelta(days=int(period))))
+    elif period == "31-60":
+        stmt = stmt.where(Contract.end_date.between(today + timedelta(days=31), today + timedelta(days=60)))
+    elif period == "61-90":
+        stmt = stmt.where(Contract.end_date.between(today + timedelta(days=61), today + timedelta(days=90)))
+    elif period == "later":
+        stmt = stmt.where(Contract.end_date > today + timedelta(days=90))
     elif period == "expired":
         stmt = stmt.where(Contract.end_date < today)
     elif period == "unknown":

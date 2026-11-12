@@ -174,7 +174,7 @@ Cada solicitação de alteração deve gerar entrada rastreável, commit(s), tes
 
 **Pedido:** adicionar filtros de secretaria e janela de vencimento (30/60/90 dias) e gráficos reais de distribuição por área e por faixas de prazo na visão geral, mantendo a arquitetura vanilla HTML/CSS/JS sem dependências novas.
 
-**Escopo:** `GET /api/summary` aceita parâmetros opcionais retrocompatíveis `secretary_id` e `window` (`30|60|90`) e retorna `by_secretary` (com `id`, `name` e `count` na janela escolhida) e `by_window` (faixas reais `30`, `60`, `90`, `active`, `expired`, `unknown`); `#overview` recebe filtros de área e janela, gráfico clicável por secretaria, gráfico clicável por faixas de prazo e tabela de próximos vencimentos sincronizada com os filtros, preservando todos os IDs e hooks existentes.
+**Escopo:** `GET /api/summary` aceita parâmetros opcionais retrocompatíveis `secretary_id` e `window` (`30|60|90`) e retorna `by_secretary` (com `id`, `name` e `count` na janela escolhida) e `by_window` (faixas exatas `30`, `31-60`, `61-90`, `later`, `expired`, `unknown`, também aceitas em `GET /api/contracts?period=`); `#overview` recebe filtros de área e janela, gráfico clicável por secretaria, gráfico clicável por faixas de prazo e tabela de próximos vencimentos sincronizada com os filtros, preservando todos os IDs e hooks existentes.
 
 **Aceite técnico:** testes automatizados para `/api/summary` padrão, filtrado por `secretary_id` e `window` (`30`/`60`/`90`) e validação `422` para janela inválida; `compileall`, `node --check app/static/app.js`, `pytest` e `git diff --check` verdes.
 
