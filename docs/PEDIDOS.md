@@ -145,3 +145,13 @@ Cada solicitação de alteração deve gerar entrada rastreável, commit(s), tes
 - **Solicitação:** revisar a visualização no celular e corrigir bugs de design em todos os módulos.
 - **Implementado:** menu móvel com fechamento por fundo, tabelas transformadas em cartões legíveis em telas estreitas, filtros e paginação reorganizados, catálogo de licitações sem rolagem horizontal interna e preservação do calendário como grade compacta com painel de detalhes.
 - **Validação:** viewport de 390 px em produção, sem overflow horizontal no documento; módulos de visão geral, contratos, contratações, licitações, calendário, secretarias e sincronização conferidos.
+
+## CT-0014 — Vigência efetiva e acervo inicial de contratos
+
+**Pedido:** corrigir contratos cuja vigência publicada foi alterada por aditivos e evitar que contratos encerrados ocupem a visão inicial do acervo, sem apagar o histórico.
+
+**Escopo:** recalcular a vigência desde os campos do contrato-base e reaplicar somente termos não excluídos, incluindo reversão quando o último termo for anulado/excluído; adicionar filtro explícito de contratos em vigência e deixar essa visão como padrão da interface. Os filtros `Todos` e `Encerrados` continuam disponíveis para consulta histórica.
+
+**Aceite técnico:** teste de recomputação após exclusão de termo, filtro API `active`, JavaScript/Python válidos, suíte automatizada executada quando as dependências estiverem disponíveis e smoke test no Coolify após revisão.
+
+**Status:** em implementação na branch `fix/CT-0014-vigencia-efetiva-acervo`.

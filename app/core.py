@@ -279,17 +279,18 @@ def upsert_contract(session: Session, payload: dict) -> str:
 
 
 def refresh_contract_effective_fields(contract: Contract) -> None:
-    """Aplica ao contrato a última vigência/valor publicado em termos ativos."""
-    terms = [term for term in contract.terms if not term.excluded]
-    if not terms:
-        return
-    latest = max(terms, key=lambda term: (term.sequence, term.published_at or date.min))
-    if latest.start_date:
-        contract.start_date = latest.start_date
-    if latest.end_date:
-        contract.end_date = latest.end_date
-    if latest.global_amount is not None and latest.qualifies_amount:
-        contract.amount = latest.global_amount
+    """Recalcula a vigência efetiva desde a base e os termos ainda válidos."""
+    raw = contract.raw if isinstance(contract.raw, dict) else {}
+    contract.start_date = parse_date(raw.get("dataVigenciaInicio"))
+    contract.end_date = parse_date(raw.get("dataVigenciaFim"))
+    contract.amount = parse_amount(raw.get("valorGlobal"))
+    for term in sorted((term for term in contract.terms if not term.excluded), key=lambda item: (item.sequence, item.published_at or date.min)):
+        if term.start_date:
+            contract.start_date = term.start_date
+        if term.end_date:
+            contract.end_date = term.end_date
+        if term.global_amount is not None and term.qualifies_amount:
+            contract.amount = term.global_amount
 
 
 def upsert_contract_term(session: Session, contract: Contract, payload: dict) -> str:

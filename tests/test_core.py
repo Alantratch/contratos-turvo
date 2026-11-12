@@ -68,6 +68,25 @@ def test_contract_terms_are_stored_and_update_effective_vigency():
         assert serialize_contract(stored)["terms_count"] == 1
 
 
+def test_effective_fields_revert_to_base_when_latest_term_is_excluded():
+    Base.metadata.create_all(engine)
+    with SessionLocal() as db:
+        payload = sample()
+        payload["numeroControlePNCP"] = "78279973000107-2-00002/2026"
+        upsert_contract(db, payload)
+        contract = db.scalar(select(Contract).where(Contract.pncp_key == payload["numeroControlePNCP"]))
+        term = {
+            "sequencialTermoContrato": 1,
+            "dataVigenciaFim": "2027-06-30",
+            "qualificacaoVigencia": True,
+        }
+        upsert_contract_term(db, contract, term)
+        assert contract.end_date == date(2027, 6, 30)
+        term["excluido"] = True
+        assert upsert_contract_term(db, contract, term) == "updated"
+        assert contract.end_date == date(2026, 12, 31)
+
+
 def test_other_municipality_is_ignored():
     with SessionLocal() as db:
         data = sample()
@@ -274,8 +293,11 @@ def test_contracts_prioritize_active_records_over_expired_records():
         db.commit()
     with TestClient(__import__("app.main", fromlist=["app"]).app) as client:
         response = client.get("/api/contracts?q=ORDER+TEST&period=all", auth=("test", "test-password"))
+        active_response = client.get("/api/contracts?q=ORDER+TEST&period=active", auth=("test", "test-password"))
     assert response.status_code == 200
     assert response.json()["items"][0]["supplier"] == "ORDER TEST ACTIVE"
+    assert active_response.status_code == 200
+    assert [item["supplier"] for item in active_response.json()["items"]] == ["ORDER TEST ACTIVE"]
 
 
 def test_pncp_adapter_pagination_and_cnpj_filter():

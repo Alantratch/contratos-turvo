@@ -131,7 +131,7 @@ def contracts(
     limit: int = Query(25, ge=1, le=100),
     secretary_id: int | None = Query(None, ge=1),
     due_date: date | None = None,
-    period: str = Query("all", pattern="^(all|30|60|90|expired|unknown)$"),
+    period: str = Query("all", pattern="^(all|active|30|60|90|expired|unknown)$"),
     session: Session = Depends(db),
 ):
     today = date.today()
@@ -148,7 +148,9 @@ def contracts(
         stmt = stmt.where(Contract.secretary_id == secretary_id)
     if due_date is not None:
         stmt = stmt.where(Contract.end_date == due_date)
-    if period in ("30", "60", "90"):
+    if period == "active":
+        stmt = stmt.where(Contract.start_date <= today, Contract.end_date >= today)
+    elif period in ("30", "60", "90"):
         stmt = stmt.where(Contract.end_date.between(today, today + timedelta(days=int(period))))
     elif period == "expired":
         stmt = stmt.where(Contract.end_date < today)

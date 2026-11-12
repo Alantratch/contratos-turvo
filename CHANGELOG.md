@@ -1,5 +1,9 @@
 # Histórico de versões
 
+## [0.12.2] — 2026-11-12
+- Recalculo da vigência efetiva desde o contrato-base e termos não excluídos, evitando datas stale após aditivos ou anulações.
+- Filtro `Em vigência` como visão inicial do acervo; contratos históricos continuam acessíveis em `Todos` e `Encerrados`.
+
 ## [0.12.1] — 2026-11-12
 - Revisão responsiva por módulo para telas de celular.
 - Tabelas de contratos, contratações, licitações e sincronização viram cartões empilhados, sem rolagem horizontal interna.
