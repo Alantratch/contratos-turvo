@@ -94,28 +94,48 @@ def assets(name: str):
 
 
 @app.get("/api/summary")
-def summary(session: Session = Depends(db)):
+def summary(
+    secretary_id: int | None = Query(None, ge=1),
+    window: str = Query("60", pattern="^(30|60|90)$"),
+    session: Session = Depends(db),
+):
     today = date.today()
-    all_contracts = session.scalar(select(func.count()).select_from(Contract)) or 0
-    active = session.scalar(select(func.count()).select_from(Contract).where(Contract.end_date >= today, Contract.start_date <= today)) or 0
-    upcoming = session.scalar(select(func.count()).select_from(Contract).where(Contract.end_date.between(today, today + timedelta(days=30)))) or 0
-    expired = session.scalar(select(func.count()).select_from(Contract).where(Contract.end_date < today)) or 0
-    unclassified = session.scalar(select(func.count()).select_from(Contract).where(Contract.secretary_id.is_(None))) or 0
+    window_days = int(window)
+    scope = [Contract.secretary_id == secretary_id] if secretary_id is not None else []
+    all_contracts = session.scalar(select(func.count()).select_from(Contract).where(*scope)) or 0
+    active = session.scalar(select(func.count()).select_from(Contract).where(*scope, Contract.end_date >= today, Contract.start_date <= today)) or 0
+    upcoming = session.scalar(select(func.count()).select_from(Contract).where(*scope, Contract.end_date.between(today, today + timedelta(days=30)))) or 0
+    due_60 = session.scalar(select(func.count()).select_from(Contract).where(*scope, Contract.end_date.between(today + timedelta(days=31), today + timedelta(days=60)))) or 0
+    due_90 = session.scalar(select(func.count()).select_from(Contract).where(*scope, Contract.end_date.between(today + timedelta(days=61), today + timedelta(days=90)))) or 0
+    active_later = session.scalar(select(func.count()).select_from(Contract).where(*scope, Contract.end_date > today + timedelta(days=90))) or 0
+    expired = session.scalar(select(func.count()).select_from(Contract).where(*scope, Contract.end_date < today)) or 0
+    unknown = session.scalar(select(func.count()).select_from(Contract).where(*scope, Contract.end_date.is_(None))) or 0
+    unclassified = session.scalar(select(func.count()).select_from(Contract).where(*scope, Contract.secretary_id.is_(None))) or 0
     procurements = session.scalar(select(func.count()).select_from(Procurement)) or 0
     terms = session.scalar(select(func.count()).select_from(ContractTerm).where(ContractTerm.excluded.is_(False))) or 0
     groups = session.execute(
-        select(Secretary.name, func.count(Contract.id))
+        select(Secretary.id, Secretary.name, func.count(Contract.id))
         .join(Contract, Contract.secretary_id == Secretary.id)
-        .where(Contract.end_date.between(today, today + timedelta(days=60)))
-        .group_by(Secretary.name)
-        .order_by(func.count(Contract.id).desc())
+        .where(*scope, Contract.end_date.between(today, today + timedelta(days=window_days)))
+        .group_by(Secretary.id, Secretary.name)
+        .order_by(func.count(Contract.id).desc(), Secretary.name)
     ).all()
     latest = session.scalar(select(SyncRun).order_by(SyncRun.id.desc()).limit(1))
     return {
         "all": all_contracts, "active": active, "upcoming": upcoming,
         "expired": expired, "unclassified": unclassified,
         "procurements": procurements, "terms": terms,
-        "by_secretary": [{"name": n, "count": count} for n, count in groups],
+        "window": window_days,
+        "secretary_id": secretary_id,
+        "by_secretary": [{"id": sid, "name": n, "count": count} for sid, n, count in groups],
+        "by_window": [
+            {"key": "30", "label": "Até 30 dias", "count": upcoming},
+            {"key": "60", "label": "31 a 60 dias", "count": due_60},
+            {"key": "90", "label": "61 a 90 dias", "count": due_90},
+            {"key": "active", "label": "Acima de 90 dias", "count": active_later},
+            {"key": "expired", "label": "Encerrados", "count": expired},
+            {"key": "unknown", "label": "Sem data", "count": unknown},
+        ],
         "sync": {
             "status": latest.status,
             "finished_at": latest.finished_at.isoformat() if latest.finished_at else None,

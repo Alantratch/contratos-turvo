@@ -1,5 +1,9 @@
 # Histórico de versões
 
+## [0.13.0] — 2026-11-12
+- `GET /api/summary` aceita filtros retrocompatíveis `secretary_id` e `window` (`30`, `60`, `90`) e retorna a distribuição real por faixas de prazo (`by_window`).
+- Visão geral (`#overview`) ganhou filtros de área responsável e janela de vencimento, gráfico interativo por secretaria e gráfico de distribuição por prazos em HTML/CSS/JS vanilla, sem novas dependências.
+
 ## [0.12.3] — 2026-11-12
 - Validação do CNPJ-alvo e preservação de campos em payloads parciais.
 - Snapshots de alterações de termos, rollback por contrato e paginação Equiplano.

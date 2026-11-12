@@ -595,3 +595,74 @@ def test_sync_terms_commits_each_contract_after_failure(monkeypatch):
         assert {term.term_key for term in terms} == {f"{keys[0]}#termo-1", f"{keys[2]}#termo-1"}
         assert run.status == "error"
         assert run.processed == 2
+
+
+def test_summary_accepts_secretary_and_window_filters_and_returns_by_window():
+    from fastapi.testclient import TestClient
+    from app.main import app
+
+    Base.metadata.create_all(engine)
+    today = date.today()
+    with SessionLocal() as db:
+        area_a = db.scalar(select(Secretary).where(Secretary.name == "SECRETARIA DASHBOARD A"))
+        if not area_a:
+            area_a = Secretary(name="SECRETARIA DASHBOARD A")
+            db.add(area_a)
+        area_b = db.scalar(select(Secretary).where(Secretary.name == "SECRETARIA DASHBOARD B"))
+        if not area_b:
+            area_b = Secretary(name="SECRETARIA DASHBOARD B")
+            db.add(area_b)
+        db.flush()
+
+        c30 = sample()
+        c30["numeroControlePNCP"] = "78279973000107-2-00071/2026"
+        c30["dataVigenciaInicio"] = (today - timedelta(days=10)).isoformat()
+        c30["dataVigenciaFim"] = (today + timedelta(days=15)).isoformat()
+        upsert_contract(db, c30)
+        db.scalar(select(Contract).where(Contract.pncp_key == c30["numeroControlePNCP"])).secretary_id = area_a.id
+
+        c60 = sample()
+        c60["numeroControlePNCP"] = "78279973000107-2-00072/2026"
+        c60["dataVigenciaInicio"] = (today - timedelta(days=10)).isoformat()
+        c60["dataVigenciaFim"] = (today + timedelta(days=45)).isoformat()
+        upsert_contract(db, c60)
+        db.scalar(select(Contract).where(Contract.pncp_key == c60["numeroControlePNCP"])).secretary_id = area_a.id
+
+        c90 = sample()
+        c90["numeroControlePNCP"] = "78279973000107-2-00073/2026"
+        c90["dataVigenciaInicio"] = (today - timedelta(days=10)).isoformat()
+        c90["dataVigenciaFim"] = (today + timedelta(days=75)).isoformat()
+        upsert_contract(db, c90)
+        db.scalar(select(Contract).where(Contract.pncp_key == c90["numeroControlePNCP"])).secretary_id = area_b.id
+
+        area_a_id = area_a.id
+        area_b_id = area_b.id
+        db.commit()
+
+    auth = ("test", "test-password")
+    with TestClient(app) as client:
+        default_res = client.get("/api/summary", auth=auth)
+        assert default_res.status_code == 200
+        default_data = default_res.json()
+        assert default_data["window"] == 60
+        assert isinstance(default_data["by_window"], list)
+        assert {b["key"] for b in default_data["by_window"]} == {"30", "60", "90", "active", "expired", "unknown"}
+
+        filtered_30 = client.get(f"/api/summary?secretary_id={area_a_id}&window=30", auth=auth).json()
+        assert filtered_30["secretary_id"] == area_a_id
+        assert filtered_30["window"] == 30
+        assert filtered_30["all"] == 2
+        assert filtered_30["active"] == 2
+        assert filtered_30["upcoming"] == 1
+        assert filtered_30["by_secretary"] == [{"id": area_a_id, "name": "SECRETARIA DASHBOARD A", "count": 1}]
+        buckets_a = {b["key"]: b["count"] for b in filtered_30["by_window"]}
+        assert buckets_a["30"] == 1
+        assert buckets_a["60"] == 1
+        assert buckets_a["90"] == 0
+
+        filtered_90 = client.get(f"/api/summary?secretary_id={area_b_id}&window=90", auth=auth).json()
+        assert filtered_90["by_secretary"] == [{"id": area_b_id, "name": "SECRETARIA DASHBOARD B", "count": 1}]
+        buckets_b = {b["key"]: b["count"] for b in filtered_90["by_window"]}
+        assert buckets_b["90"] == 1
+
+        assert client.get("/api/summary?window=45", auth=auth).status_code == 422

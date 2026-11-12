@@ -68,6 +68,7 @@
     $("breadcrumb").textContent = names[next];
     document.querySelector(".app-shell").classList.remove("menu-open");
     $("menu-toggle").setAttribute("aria-expanded", "false");
+    if (next === "overview") loadSummary();
     if (next === "contracts") loadContracts();
     if (next === "procurements") loadProcurements();
     if (next === "licitacoes") loadLicitacoes();
@@ -78,7 +79,14 @@
 
   async function loadSummary() {
     try {
-      const s = await api("/api/summary");
+      const secretaryId = $("overview-secretary-filter") ? $("overview-secretary-filter").value : "";
+      const windowDays = $("overview-window-filter") ? $("overview-window-filter").value : "60";
+      const summaryParams = new URLSearchParams({window: windowDays});
+      if (secretaryId) summaryParams.set("secretary_id", secretaryId);
+      if ($("overview-clear-filters")) $("overview-clear-filters").hidden = !secretaryId && windowDays === "60";
+      if ($("secretary-chart-lead")) $("secretary-chart-lead").textContent = "Distribuição por área nos próximos " + windowDays + " dias";
+      if ($("upcoming-lead")) $("upcoming-lead").textContent = "Contratos que vencem nos próximos " + windowDays + " dias";
+      const s = await api("/api/summary?" + summaryParams);
       $("stat-all").textContent = number(s.all);
       $("stat-active").textContent = number(s.active);
       $("stat-upcoming").textContent = number(s.upcoming);
@@ -88,25 +96,42 @@
       $("secretary-chart").className = groups.length ? "chart-bars" : "chart-empty";
       $("secretary-chart").innerHTML = groups.length ? groups.slice(0, 7).map((g) => {
         const width = Math.max(1, Math.round(100 * g.count / Math.max(1, groups[0].count)));
-        return '<div class="chart-row"><strong>' + html(g.name) + '</strong><div class="chart-track"><div class="chart-fill" style="width:' + width + '%"></div></div><span>' + number(g.count) + '</span></div>';
-      }).join("") : "Sem contratos classificados com vencimento nos próximos 60 dias.";
-      const upcoming = await api("/api/contracts?period=30&limit=5");
+        return '<button type="button" class="chart-row chart-button" data-secretary-id="' + html(g.id || "") + '" aria-label="Filtrar por ' + html(g.name) + ': ' + number(g.count) + '"><strong>' + html(g.name) + '</strong><span class="chart-track"><span class="chart-fill" style="width:' + width + '%"></span></span><span>' + number(g.count) + '</span></button>';
+      }).join("") : "Sem contratos classificados com vencimento nos próximos " + windowDays + " dias.";
+      if ($("window-chart")) {
+        const buckets = s.by_window || [];
+        const maxBucket = Math.max(1, ...buckets.map((b) => b.count || 0));
+        $("window-chart").className = buckets.some((b) => b.count > 0) ? "chart-bars" : "chart-empty";
+        $("window-chart").innerHTML = buckets.some((b) => b.count > 0) ? buckets.map((b) => {
+          const width = b.count > 0 ? Math.max(2, Math.round(100 * b.count / maxBucket)) : 0;
+          return '<button type="button" class="chart-row chart-button" data-window-key="' + html(b.key) + '" aria-label="Ver contratos ' + html(b.label) + ': ' + number(b.count) + '"><strong>' + html(b.label) + '</strong><span class="chart-track"><span class="chart-fill is-' + html(b.key) + '" style="width:' + width + '%"></span></span><span>' + number(b.count) + '</span></button>';
+        }).join("") : "Nenhum contrato encontrado para o filtro selecionado.";
+      }
+      const upcomingParams = new URLSearchParams({period: windowDays, limit: "5"});
+      if (secretaryId) upcomingParams.set("secretary_id", secretaryId);
+      const upcoming = await api("/api/contracts?" + upcomingParams);
       $("upcoming-body").innerHTML = upcoming.items.length ? upcoming.items.map((c) =>
         '<tr><td><strong>' + html(c.number || c.pncp_key) + '</strong><span class="subline">' + html(c.year || "") + '</span></td><td>' +
         html(c.supplier || "Não informado") + '</td><td>' + html(c.secretary || "Não atribuída") +
         '</td><td>' + date(c.end_date) + '</td><td>' + status(c.end_date) + '</td></tr>'
-      ).join("") : '<tr><td colspan="5" class="empty">Nenhum vencimento encontrado nos próximos 30 dias.</td></tr>';
+      ).join("") : '<tr><td colspan="5" class="empty">Nenhum vencimento encontrado nos próximos ' + windowDays + ' dias.</td></tr>';
     } catch (err) { feedback("Não foi possível atualizar o panorama: " + err.message, true); }
   }
 
   async function loadSecretaries() {
     try {
       secretaries = await api("/api/secretaries");
+      const optionsHtml = secretaries.map(s => '<option value="' + s.id + '">' + html(s.name) + '</option>').join("");
       const current = $("secretary-filter").value;
-      $("secretary-filter").innerHTML = '<option value="">Todas</option>' + secretaries.map(s => '<option value="' + s.id + '">' + html(s.name) + '</option>').join("");
+      $("secretary-filter").innerHTML = '<option value="">Todas</option>' + optionsHtml;
       $("secretary-filter").value = current;
+      if ($("overview-secretary-filter")) {
+        const overviewCurrent = $("overview-secretary-filter").value;
+        $("overview-secretary-filter").innerHTML = '<option value="">Todas as áreas</option>' + optionsHtml;
+        $("overview-secretary-filter").value = overviewCurrent;
+      }
       const calendarCurrent = $("calendar-secretary-filter").value;
-      $("calendar-secretary-filter").innerHTML = '<option value="">Todas as secretarias</option>' + secretaries.map(s => '<option value="' + s.id + '">' + html(s.name) + '</option>').join("");
+      $("calendar-secretary-filter").innerHTML = '<option value="">Todas as secretarias</option>' + optionsHtml;
       $("calendar-secretary-filter").value = calendarCurrent;
       $("secretary-list").innerHTML = secretaries.length ? secretaries.map((s) =>
         '<div class="secretary-item"><div><strong>' + html(s.name) + '</strong><small>' + html(s.email || "Sem e-mail cadastrado") + '</small></div><span class="tag">Cadastro</span></div>'
@@ -501,7 +526,39 @@
     page = 1;
     loadContracts();
   });
-  $("see-all").addEventListener("click", () => { page = 1; $("period-filter").value = "30"; switchView("contracts"); });
+  $("see-all").addEventListener("click", () => {
+    page = 1;
+    $("period-filter").value = $("overview-window-filter") ? $("overview-window-filter").value : "30";
+    if ($("overview-secretary-filter")) $("secretary-filter").value = $("overview-secretary-filter").value;
+    switchView("contracts");
+  });
+  ["overview-secretary-filter", "overview-window-filter"].forEach((id) => {
+    if ($(id)) $(id).addEventListener("change", loadSummary);
+  });
+  if ($("overview-clear-filters")) {
+    $("overview-clear-filters").addEventListener("click", () => {
+      $("overview-secretary-filter").value = "";
+      $("overview-window-filter").value = "60";
+      loadSummary();
+    });
+  }
+  $("secretary-chart").addEventListener("click", (e) => {
+    const row = e.target.closest("button[data-secretary-id]");
+    if (row && row.dataset.secretaryId && $("overview-secretary-filter")) {
+      $("overview-secretary-filter").value = row.dataset.secretaryId;
+      loadSummary();
+    }
+  });
+  if ($("window-chart")) {
+    $("window-chart").addEventListener("click", (e) => {
+      const row = e.target.closest("button[data-window-key]");
+      if (!row) return;
+      page = 1;
+      $("period-filter").value = row.dataset.windowKey;
+      if ($("overview-secretary-filter")) $("secretary-filter").value = $("overview-secretary-filter").value;
+      switchView("contracts");
+    });
+  }
   $("contract-search").addEventListener("input", () => {
     clearTimeout(searchTimer);
     searchTimer = setTimeout(() => { page = 1; loadContracts(); }, 320);
