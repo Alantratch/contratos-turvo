@@ -15,7 +15,26 @@ DATABASE_URL = os.getenv("DATABASE_URL")
 if not DATABASE_URL:
     raise RuntimeError("DATABASE_URL é obrigatório; não inicie sem banco configurado.")
 
-TARGET_CNPJ = re.sub(r"\D", "", os.getenv("TARGET_CNPJ", "78279973000107"))
+
+def normalize_cnpj(value) -> str:
+    return re.sub(r"\D", "", str(value or ""))
+
+
+def valid_cnpj(value) -> bool:
+    digits = normalize_cnpj(value)
+    if len(digits) != 14 or len(set(digits)) == 1:
+        return False
+    for length, weights in ((12, (5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2)), (13, (6, 5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2))):
+        total = sum(int(digit) * weight for digit, weight in zip(digits[:length], weights))
+        check = 0 if total % 11 < 2 else 11 - total % 11
+        if int(digits[length]) != check:
+            return False
+    return True
+
+
+TARGET_CNPJ = normalize_cnpj(os.getenv("TARGET_CNPJ", "78279973000107"))
+if not valid_cnpj(TARGET_CNPJ):
+    raise RuntimeError("TARGET_CNPJ deve ser um CNPJ válido de 14 dígitos.")
 engine = create_engine(DATABASE_URL, pool_pre_ping=True, future=True)
 SessionLocal = sessionmaker(bind=engine, expire_on_commit=False)
 
@@ -88,6 +107,15 @@ class ContractTerm(Base):
     raw: Mapped[dict] = mapped_column(JSON)
     last_seen_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     contract: Mapped[Contract] = relationship(back_populates="terms")
+
+
+class ContractTermRevision(Base):
+    __tablename__ = "contract_term_revisions"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    term_id: Mapped[int] = mapped_column(ForeignKey("contract_terms.id"), index=True)
+    digest: Mapped[str] = mapped_column(String(64))
+    raw: Mapped[dict] = mapped_column(JSON)
+    captured_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
 
 class Procurement(Base):
@@ -247,6 +275,19 @@ def parse_bool(value, default: bool = False) -> bool:
     return default
 
 
+def merge_payload(previous: dict | None, incoming: dict) -> dict:
+    """Preserva campos antigos quando a fonte envia payload parcial ou nulo."""
+    result = dict(previous or {})
+    for key, value in incoming.items():
+        if value is None and key in result:
+            continue
+        if isinstance(value, dict) and isinstance(result.get(key), dict):
+            result[key] = merge_payload(result[key], value)
+        else:
+            result[key] = value
+    return result
+
+
 def upsert_contract(session: Session, payload: dict) -> str:
     """Importa somente o CNPJ-alvo. Preserva secretaria e snapshots em alterações."""
     if not isinstance(payload, dict):
@@ -258,29 +299,34 @@ def upsert_contract(session: Session, payload: dict) -> str:
         return "ignored"
 
     raw = json.loads(json.dumps(payload, ensure_ascii=False, default=str))
-    digest = hashlib.sha256(json.dumps(raw, sort_keys=True, ensure_ascii=False).encode()).hexdigest()
     current = session.scalar(select(Contract).where(Contract.pncp_key == key))
+    merged_raw = merge_payload(current.raw if current and isinstance(current.raw, dict) else {}, raw)
+    digest = hashlib.sha256(json.dumps(merged_raw, sort_keys=True, ensure_ascii=False).encode()).hexdigest()
     if current and current.digest == digest:
         current.last_seen_at = utcnow()
         refresh_contract_effective_fields(current)
         return "unchanged"
 
     unit = raw.get("unidadeOrgao") or {}
+
+    def value(key: str, parsed, fallback=None):
+        return parsed if key in raw and parsed not in (None, "") else fallback
+
     fields = {
         "buyer_cnpj": buyer,
-        "number": str(raw.get("numeroContratoEmpenho") or "")[:70],
-        "year": raw.get("anoContrato"),
-        "sequence": raw.get("sequencialContrato"),
-        "supplier": str(raw.get("nomeRazaoSocialFornecedor") or "")[:300],
-        "object": str(raw.get("objetoContrato") or raw.get("objeto") or ""),
-        "unit": str(unit.get("nomeUnidade") or "")[:250],
-        "unit_code": str(unit.get("codigoUnidade") or "")[:100],
-        "amount": parse_amount(raw.get("valorGlobal")),
-        "start_date": parse_date(raw.get("dataVigenciaInicio")),
-        "end_date": parse_date(raw.get("dataVigenciaFim")),
-        "procurement_key": str(raw.get("numeroControlePncpCompra") or "")[:110] or None,
+        "number": value("numeroContratoEmpenho", str(raw.get("numeroContratoEmpenho") or "")[:70], current.number if current else ""),
+        "year": value("anoContrato", raw.get("anoContrato"), current.year if current else None),
+        "sequence": value("sequencialContrato", raw.get("sequencialContrato"), current.sequence if current else None),
+        "supplier": value("nomeRazaoSocialFornecedor", str(raw.get("nomeRazaoSocialFornecedor") or "")[:300], current.supplier if current else ""),
+        "object": value("objetoContrato", str(raw.get("objetoContrato") or raw.get("objeto") or ""), current.object if current else ""),
+        "unit": value("unidadeOrgao", str(unit.get("nomeUnidade") or "")[:250], current.unit if current else ""),
+        "unit_code": value("unidadeOrgao", str(unit.get("codigoUnidade") or "")[:100], current.unit_code if current else ""),
+        "amount": value("valorGlobal", parse_amount(raw.get("valorGlobal")), current.amount if current else None),
+        "start_date": value("dataVigenciaInicio", parse_date(raw.get("dataVigenciaInicio")), current.start_date if current else None),
+        "end_date": value("dataVigenciaFim", parse_date(raw.get("dataVigenciaFim")), current.end_date if current else None),
+        "procurement_key": value("numeroControlePncpCompra", str(raw.get("numeroControlePncpCompra") or "")[:110] or None, current.procurement_key if current else None),
         "digest": digest,
-        "raw": raw,
+        "raw": merged_raw,
         "last_seen_at": utcnow(),
     }
     status = "updated" if current else "inserted"
@@ -326,8 +372,7 @@ def upsert_contract_term(session: Session, contract: Contract, payload: dict) ->
     key = f"{contract.pncp_key}#termo-{sequence}"
     current = session.scalar(select(ContractTerm).where(ContractTerm.term_key == key))
     raw = json.loads(json.dumps(payload, ensure_ascii=False, default=str))
-    merged_raw = dict(current.raw or {}) if current and isinstance(current.raw, dict) else {}
-    merged_raw.update(raw)
+    merged_raw = merge_payload(current.raw if current and isinstance(current.raw, dict) else {}, raw)
     digest = hashlib.sha256(json.dumps(merged_raw, sort_keys=True, ensure_ascii=False).encode()).hexdigest()
     if current and current.digest == digest:
         current.last_seen_at = utcnow()
@@ -373,6 +418,7 @@ def upsert_contract_term(session: Session, contract: Contract, payload: dict) ->
         current = ContractTerm(term_key=key, **fields)
         session.add(current)
     else:
+        session.add(ContractTermRevision(term_id=current.id, digest=current.digest, raw=current.raw or {}))
         for column, value in fields.items():
             setattr(current, column, value)
     session.flush()
@@ -390,30 +436,35 @@ def upsert_procurement(session: Session, payload: dict) -> str:
     key = str(payload.get("numeroControlePNCP") or "").strip()
     if buyer != TARGET_CNPJ or not key:
         return "ignored"
-    raw = json.loads(json.dumps(payload, ensure_ascii=False, default=str))
-    digest = hashlib.sha256(json.dumps(raw, sort_keys=True, ensure_ascii=False).encode()).hexdigest()
     current = session.scalar(select(Procurement).where(Procurement.source_key == key))
+    raw = json.loads(json.dumps(payload, ensure_ascii=False, default=str))
+    merged_raw = merge_payload(current.raw if current and isinstance(current.raw, dict) else {}, raw)
+    digest = hashlib.sha256(json.dumps(merged_raw, sort_keys=True, ensure_ascii=False).encode()).hexdigest()
     if current and current.digest == digest:
         current.last_seen_at = utcnow()
         return "unchanged"
+
+    def value(name: str, parsed, fallback=None):
+        return parsed if name in raw and parsed not in (None, "") else fallback
+
     fields = {
         "buyer_cnpj": buyer,
-        "number": str(raw.get("numeroCompra") or "")[:70],
-        "year": raw.get("anoCompraPncp"),
-        "sequence": raw.get("sequencialCompraPncp"),
-        "modality": str(raw.get("modalidadeNome") or "")[:120],
-        "status": str(raw.get("situacaoCompraNomePncp") or "")[:120],
-        "object": str(raw.get("objetoCompra") or ""),
-        "process": str(raw.get("processo") or "")[:120],
-        "estimated_amount": parse_amount(raw.get("valorTotalEstimado")),
-        "awarded_amount": parse_amount(raw.get("valorTotalHomologado")),
-        "opening_date": parse_date(raw.get("dataAberturaPropostaPncp")),
-        "published_at": parse_date(raw.get("dataPublicacaoPncp")),
-        "proposal_end": parse_date(raw.get("dataEncerramentoPropostaPncp")),
-        "result_exists": bool(raw.get("existeResultado")),
-        "info_url": extract_url(raw.get("informacaoComplementar")),
+        "number": value("numeroCompra", str(raw.get("numeroCompra") or "")[:70], current.number if current else ""),
+        "year": value("anoCompraPncp", raw.get("anoCompraPncp"), current.year if current else None),
+        "sequence": value("sequencialCompraPncp", raw.get("sequencialCompraPncp"), current.sequence if current else None),
+        "modality": value("modalidadeNome", str(raw.get("modalidadeNome") or "")[:120], current.modality if current else ""),
+        "status": value("situacaoCompraNomePncp", str(raw.get("situacaoCompraNomePncp") or "")[:120], current.status if current else ""),
+        "object": value("objetoCompra", str(raw.get("objetoCompra") or ""), current.object if current else ""),
+        "process": value("processo", str(raw.get("processo") or "")[:120], current.process if current else ""),
+        "estimated_amount": value("valorTotalEstimado", parse_amount(raw.get("valorTotalEstimado")), current.estimated_amount if current else None),
+        "awarded_amount": value("valorTotalHomologado", parse_amount(raw.get("valorTotalHomologado")), current.awarded_amount if current else None),
+        "opening_date": value("dataAberturaPropostaPncp", parse_date(raw.get("dataAberturaPropostaPncp")), current.opening_date if current else None),
+        "published_at": value("dataPublicacaoPncp", parse_date(raw.get("dataPublicacaoPncp")), current.published_at if current else None),
+        "proposal_end": value("dataEncerramentoPropostaPncp", parse_date(raw.get("dataEncerramentoPropostaPncp")), current.proposal_end if current else None),
+        "result_exists": value("existeResultado", parse_bool(raw.get("existeResultado"), current.result_exists if current else False), current.result_exists if current else False),
+        "info_url": value("informacaoComplementar", extract_url(raw.get("informacaoComplementar")), current.info_url if current else None),
         "digest": digest,
-        "raw": raw,
+        "raw": merged_raw,
         "last_seen_at": utcnow(),
     }
     status = "updated" if current else "inserted"

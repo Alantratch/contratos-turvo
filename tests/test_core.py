@@ -1,10 +1,10 @@
 from datetime import date, timedelta
 from app.core import (
-    Base, Contract, ContractRevision, ContractTerm, Procurement, Secretary, SessionLocal,
+    Base, Contract, ContractRevision, ContractTerm, ContractTermRevision, Procurement, Secretary, SessionLocal, SyncRun,
     auto_classify_contract_units, engine, parse_date, serialize_contract, serialize_procurement, upsert_contract,
-    upsert_contract_term, upsert_procurement,
+    upsert_contract_term, upsert_procurement, valid_cnpj,
 )
-from app.worker import alert_threshold, equiplano_amount, equiplano_date_range, equiplano_object, equiplano_payload, equiplano_table
+from app.worker import alert_threshold, compras_pages, equiplano_amount, equiplano_date_range, equiplano_object, equiplano_payload, equiplano_supplier_index, equiplano_table
 from sqlalchemy import select
 
 
@@ -22,6 +22,12 @@ def sample():
         "dataVigenciaInicio": "2026-01-01",
         "dataVigenciaFim": "2026-12-31",
     }
+
+
+def test_cnpj_validation_rejects_malformed_target():
+    assert valid_cnpj("78.279.973/0001-07")
+    assert not valid_cnpj("78279973000108")
+    assert not valid_cnpj("")
 
 
 def test_upsert_idempotent_and_versions():
@@ -105,9 +111,15 @@ def test_contract_update_reapplies_active_term_after_reload():
 
         updated = dict(payload, objetoContrato="Objeto atualizado")
         assert upsert_contract(db, updated) == "updated"
+        partial = {
+            "numeroControlePNCP": payload["numeroControlePNCP"],
+            "orgaoEntidade": {"cnpj": "78279973000107"},
+        }
+        assert upsert_contract(db, partial) == "unchanged"
         db.commit()
 
         stored = db.scalar(select(Contract).where(Contract.pncp_key == payload["numeroControlePNCP"]))
+        assert stored.supplier == "Fornecedor teste"
         assert stored.end_date == date(2027, 6, 30)
         assert stored.amount == 150.25
 
@@ -139,6 +151,46 @@ def test_partial_term_update_preserves_fields_and_parses_boolean_strings():
         assert term.excluded is False
         assert term.qualifies_duration is False
         assert stored.end_date == date(2026, 12, 31)
+        assert stored.amount == 150.25
+        assert db.scalar(select(ContractTermRevision).where(ContractTermRevision.term_id == term.id)).raw["dataVigenciaFim"] == "2027-06-30"
+
+
+def test_explicit_null_preserves_canonical_contract_and_term_payload():
+    Base.metadata.create_all(engine)
+    with SessionLocal() as db:
+        payload = sample()
+        payload["numeroControlePNCP"] = "78279973000107-2-00016/2026"
+        upsert_contract(db, payload)
+        contract = db.scalar(select(Contract).where(Contract.pncp_key == payload["numeroControlePNCP"]))
+        upsert_contract_term(db, contract, {
+            "sequencialTermoContrato": 1,
+            "dataVigenciaFim": "2027-06-30",
+            "valorGlobal": 150.25,
+            "qualificacaoVigencia": True,
+            "qualificacaoAcrescimoSupressao": True,
+        })
+        upsert_contract(db, {
+            "numeroControlePNCP": payload["numeroControlePNCP"],
+            "orgaoEntidade": {"cnpj": "78279973000107"},
+            "dataVigenciaFim": None,
+            "valorGlobal": None,
+            "unidadeOrgao": {"codigoUnidade": "9"},
+        })
+        upsert_contract_term(db, contract, {
+            "sequencialTermoContrato": 1,
+            "dataVigenciaFim": None,
+            "valorGlobal": None,
+        })
+        db.commit()
+
+        stored = db.scalar(select(Contract).where(Contract.pncp_key == payload["numeroControlePNCP"]))
+        term = db.scalar(select(ContractTerm).where(ContractTerm.term_key == f"{payload['numeroControlePNCP']}#termo-1"))
+        assert stored.raw["unidadeOrgao"]["nomeUnidade"] == "Município"
+        assert stored.unit_code == "9"
+        assert stored.raw["dataVigenciaFim"] == "2026-12-31"
+        assert stored.end_date == date(2027, 6, 30)
+        assert term.raw["dataVigenciaFim"] == "2027-06-30"
+        assert term.end_date == date(2027, 6, 30)
         assert stored.amount == 150.25
 
 
@@ -173,6 +225,14 @@ def test_compras_procurement_is_stored_separately():
         assert stored is not None
         assert stored.opening_date == date(2026, 1, 1)
         assert serialize_procurement(stored)["phase"] == "result"
+        assert upsert_procurement(db, {
+            "numeroControlePNCP": payload["numeroControlePNCP"],
+            "orgaoEntidadeCnpj": "78279973000107",
+            "existeResultado": "false",
+        }) == "updated"
+        db.commit()
+        assert stored.result_exists is False
+        assert stored.opening_date == date(2026, 1, 1)
 
 
 def test_licitacoes_api_groups_date_and_links_published_contract():
@@ -460,3 +520,78 @@ def test_equiplano_rows_keep_supplier_object_dates_and_amount():
     """)
     export_payload = equiplano_payload(2021, export_rows[0], {"supplier": "VIEIRA"})
     assert export_payload["numeroControlePNCP"] == "equiplano:2021:numero-76"
+
+
+def test_equiplano_supplier_index_reads_more_than_one_page(monkeypatch):
+    import httpx
+
+    page_one = [
+        ["codFornecedor=10", "", "Fornecedor A"],
+        ["", "", "Contrato número 76", "100,00", "Objeto A"],
+    ]
+    page_two = [["", "", "Contrato número 77", "200,00", "Objeto B"]]
+    starts = []
+
+    def fake_server(request):
+        starts.append(request.content.decode())
+        rows = page_one if "start=0" in starts[-1] else page_two
+        return httpx.Response(200, json={"paginacao": {"registrosAsJSONArray": rows, "recordsTotal": 3}}, request=request)
+
+    monkeypatch.setattr("app.worker.time.sleep", lambda _: None)
+    with httpx.Client(transport=httpx.MockTransport(fake_server)) as client:
+        index = equiplano_supplier_index(client, 2026)
+
+    assert len(starts) == 2
+    assert index[(2026, "76")]["supplier"] == "Fornecedor A"
+    assert index[(2026, "77")]["object"] == "Objeto B"
+
+
+def test_compras_pages_retries_transient_failure_and_accepts_204(monkeypatch):
+    import httpx
+
+    attempts = []
+
+    def fake_server(request):
+        attempts.append(request)
+        if len(attempts) < 3:
+            return httpx.Response(503, request=request)
+        return httpx.Response(204, request=request)
+
+    monkeypatch.setattr("app.worker.time.sleep", lambda _: None)
+    with httpx.Client(transport=httpx.MockTransport(fake_server)) as client:
+        assert list(compras_pages(client, 1, date(2026, 1, 1), date(2026, 1, 31))) == []
+    assert len(attempts) == 3
+
+
+def test_sync_terms_commits_each_contract_after_failure(monkeypatch):
+    from app.worker import sync_terms
+
+    Base.metadata.create_all(engine)
+    keys = [f"78279973000107-2-000{number}/2026" for number in (17, 18, 19)]
+    with SessionLocal() as db:
+        for key in keys:
+            payload = sample()
+            payload["numeroControlePNCP"] = key
+            upsert_contract(db, payload)
+        db.commit()
+
+    def fake_terms(_client, contract):
+        if contract.pncp_key == keys[1]:
+            raise RuntimeError("falha simulada")
+        if contract.pncp_key not in keys:
+            return []
+        return [{
+            "sequencialTermoContrato": 1,
+            "dataVigenciaFim": "2027-06-30",
+            "qualificacaoVigencia": True,
+        }]
+
+    monkeypatch.setattr("app.worker.contract_terms", fake_terms)
+    sync_terms()
+
+    with SessionLocal() as db:
+        terms = db.scalars(select(ContractTerm).where(ContractTerm.term_key.in_([f"{key}#termo-1" for key in keys]))).all()
+        run = db.scalar(select(SyncRun).where(SyncRun.kind == "terms").order_by(SyncRun.id.desc()))
+        assert {term.term_key for term in terms} == {f"{keys[0]}#termo-1", f"{keys[2]}#termo-1"}
+        assert run.status == "error"
+        assert run.processed == 2

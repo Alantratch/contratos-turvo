@@ -18,7 +18,7 @@ from sqlalchemy.orm import Session, joinedload
 from .core import (
     AlertDelivery, Contract, SyncRun, SyncState,
     SessionLocal, TARGET_CNPJ, auto_classify_contract_units, init_db, upsert_contract,
-    upsert_contract_term, upsert_procurement, utcnow,
+    upsert_contract_term, upsert_procurement, utcnow, parse_int,
 )
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
@@ -161,14 +161,16 @@ def sync_terms():
             contracts = session.scalars(select(Contract).order_by(Contract.id)).all()
             with httpx.Client(timeout=15, headers={"Accept": "application/json", "User-Agent": "ContratosTurvo/0.1"}) as client:
                 for contract in contracts:
+                    contract_processed = 0
                     try:
                         for item in contract_terms(client, contract):
                             result = upsert_contract_term(session, contract, item)
-                            processed += int(result in ("inserted", "updated"))
-                        if contract.id % 25 == 0:
-                            session.commit()
+                            contract_processed += int(result in ("inserted", "updated"))
+                        session.commit()
+                        processed += contract_processed
                     except Exception:
                         errors += 1
+                        session.rollback()
                         LOG.exception("Falha ao consultar termos do contrato %s", contract.pncp_key)
             run.processed = processed
             run.status = "error" if errors else "ok"
@@ -267,43 +269,59 @@ def equiplano_query(year: int) -> str:
 
 
 def equiplano_supplier_index(client: httpx.Client, year: int) -> dict[tuple[int, str], dict]:
-    response = client.post(
-        EQUIPLANO_BASE + "/transparencia/contratos/listaContratosAjax",
-        data={
-            "draw": "1", "start": "0", "length": "500", "search[value]": "",
-            "search[regex]": "false", "order[0][column]": "1", "order[0][dir]": "asc",
-            "formulario.codEntidade": "69", "formulario.numeroContrato": "",
-            "formulario.tipoExercicioContrato": "0", "formulario.exercicio": str(year),
-            "formulario.codLicitacaoContrato": "", "formulario.exercicioLicitacaoContrato": str(year),
-            "formulario.codTipoLicitacao": "", "formulario.nomeFornecedor": "",
-            "formulario.sumulaContrato": "", "formulario.codPessoa": "",
-            "formulario.nrDocumentoPessoa": "", "formulario.nmPessoa": "",
-            "formulario.tipoResponsabilidade": "", "formulario.tpAto": "CONTRATO",
-        },
-    )
-    response.raise_for_status()
-    body = response.json()
-    rows = (body.get("paginacao") or {}).get("registrosAsJSONArray") or []
     index = {}
     supplier = ""
-    for row in rows:
-        if not isinstance(row, list):
-            continue
-        anchor = str(row[0] or "") if row else ""
-        supplier_match = re.search(r"codFornecedor=(\d+)", anchor)
-        if supplier_match and len(row) > 2:
-            supplier = str(row[2] or "").strip()
-            continue
-        if len(row) < 5 or not row[2] or not supplier:
-            continue
-        match = re.search(r"Contrato\s+número\s+(.+)", str(row[2]), re.IGNORECASE)
-        if match:
-            number = match.group(1).strip()
-            index[(year, number)] = {
-                "supplier": supplier,
-                "object": equiplano_object(row[4]),
-                "amount": str(row[3] or "").strip(),
-            }
+    start = 0
+    while True:
+        response = client.post(
+            EQUIPLANO_BASE + "/transparencia/contratos/listaContratosAjax",
+            data={
+                "draw": "1", "start": str(start), "length": "500", "search[value]": "",
+                "search[regex]": "false", "order[0][column]": "1", "order[0][dir]": "asc",
+                "formulario.codEntidade": "69", "formulario.numeroContrato": "",
+                "formulario.tipoExercicioContrato": "0", "formulario.exercicio": str(year),
+                "formulario.codLicitacaoContrato": "", "formulario.exercicioLicitacaoContrato": str(year),
+                "formulario.codTipoLicitacao": "", "formulario.nomeFornecedor": "",
+                "formulario.sumulaContrato": "", "formulario.codPessoa": "",
+                "formulario.nrDocumentoPessoa": "", "formulario.nmPessoa": "",
+                "formulario.tipoResponsabilidade": "", "formulario.tpAto": "CONTRATO",
+            },
+        )
+        if response.status_code == 204:
+            break
+        response.raise_for_status()
+        body = response.json()
+        pagination = body.get("paginacao") or {}
+        rows = pagination.get("registrosAsJSONArray") or []
+        if not isinstance(rows, list) or not rows:
+            break
+        for row in rows:
+            if not isinstance(row, list):
+                continue
+            anchor = str(row[0] or "") if row else ""
+            supplier_match = re.search(r"codFornecedor=(\d+)", anchor)
+            if supplier_match and len(row) > 2:
+                supplier = str(row[2] or "").strip()
+                continue
+            if len(row) < 5 or not row[2] or not supplier:
+                continue
+            match = re.search(r"Contrato\s+número\s+(.+)", str(row[2]), re.IGNORECASE)
+            if match:
+                number = match.group(1).strip()
+                index[(year, number)] = {
+                    "supplier": supplier,
+                    "object": equiplano_object(row[4]),
+                    "amount": str(row[3] or "").strip(),
+                }
+        total = pagination.get("recordsFiltered") or pagination.get("recordsTotal") or body.get("recordsFiltered") or body.get("recordsTotal")
+        if total is not None and start + len(rows) >= int(total):
+            break
+        if total is None and len(rows) < 500:
+            break
+        start += len(rows)
+        # shortcut: 100000 registros por ano, quando o provedor não informa total; aumentar com paginação confirmada.
+        if start >= 100000:
+            raise ValueError("Paginação excessiva no índice Equiplano; sincronização interrompida")
     return index
 
 
@@ -365,6 +383,8 @@ def sync_equiplano():
                     for row in rows:
                         if len(row) < 4 or row[3].get("text", "").casefold() == "contrato":
                             continue
+                        if len(row) < 10:
+                            continue
                         query = parse_qs(urlparse(row[0].get("href", "")).query) if row and row[0].get("href") else {}
                         number = row[1].get("text", "").strip()
                         fallback_id = f"numero-{number}"
@@ -372,7 +392,9 @@ def sync_equiplano():
                         parent = session.scalar(select(Contract).where(Contract.pncp_key == f"equiplano:{year}:{contract_id}"))
                         if not parent:
                             continue
-                        sequence = int(row[2].get("text") or 0)
+                        sequence = parse_int(row[2].get("text"))
+                        if sequence is None:
+                            continue
                         start_date, end_date = equiplano_date_range(row[6].get("text", ""))
                         term_type_name = row[3].get("text", "") + (" / " + row[5].get("text", "") if row[5].get("text") else "")
                         normalized_term_type = term_type_name.casefold()
@@ -428,11 +450,22 @@ def compras_pages(client: httpx.Client, modality: int, begin: date, end: date):
             "pagina": page,
             "tamanhoPagina": 500,
         }
-        response = client.get(COMPRAS_BASE + "/modulo-contratacoes/1_consultarContratacoes_PNCP_14133", params=query)
-        if response.status_code == 400:
-            return
-        response.raise_for_status()
-        body = response.json()
+        for attempt in range(4):
+            try:
+                response = client.get(COMPRAS_BASE + "/modulo-contratacoes/1_consultarContratacoes_PNCP_14133", params=query)
+                if response.status_code == 204:
+                    return
+                if response.status_code in (429, 500, 502, 503, 504):
+                    raise httpx.HTTPStatusError("Compras.gov temporariamente indisponível", request=response.request, response=response)
+                response.raise_for_status()
+                body = response.json()
+                break
+            except (httpx.HTTPError, ValueError):
+                if attempt == 3:
+                    raise
+                time.sleep(2 ** attempt)
+        if not isinstance(body, dict):
+            raise ValueError("Resposta inesperada do Compras.gov: objeto esperado")
         items = body.get("resultado") or []
         if not isinstance(items, list):
             raise ValueError("Resposta inesperada do Compras.gov: resultado não é lista")

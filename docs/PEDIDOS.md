@@ -157,3 +157,13 @@ Cada solicitação de alteração deve gerar entrada rastreável, commit(s), tes
 **Status:** implementado na branch `fix/CT-0014-vigencia-efetiva-acervo`; aguardando revisão e deploy.
 
 **Commit:** `49077ec` — `fix(contracts): [CT-0014] recalculate effective validity`.
+
+## CT-0015 — Integridade do acervo e sincronizações
+
+**Pedido:** tornar o acervo confiável quando fontes públicas respondem parcialmente, paginam dados ou falham temporariamente, preservando histórico e impedindo mistura de órgãos.
+
+**Escopo:** validar o `TARGET_CNPJ`, preservar campos existentes em payloads parciais/nulos com merge profundo, registrar snapshots de alterações de termos, fazer commit/rollback por contrato na sincronização de termos, paginar o índice Equiplano e tratar retries/204 do Compras.gov. Linhas Equiplano sem sequência válida não entram no acervo.
+
+**Aceite técnico:** testes para CNPJ válido/malformado, snapshot de termo, payload parcial, paginação Equiplano acima da primeira página, retries/204 do Compras.gov, compilação, suíte automatizada e smoke no Coolify.
+
+**Status:** implementado na branch `fix/CT-0015-integridade-sincronizacao`; aguardando deploy.

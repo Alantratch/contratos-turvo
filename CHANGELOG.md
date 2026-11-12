@@ -1,5 +1,10 @@
 # Histórico de versões
 
+## [0.12.3] — 2026-11-12
+- Validação do CNPJ-alvo e preservação de campos em payloads parciais.
+- Snapshots de alterações de termos, rollback por contrato e paginação Equiplano.
+- Retries e resposta 204 tratados no sincronizador Compras.gov.
+
 ## [0.12.2] — 2026-11-12
 - Recalculo da vigência efetiva desde o contrato-base e termos não excluídos, evitando datas stale após aditivos ou anulações.
 - Atualizações da base reaplicam termos ativos, preservam termos parciais e interpretam qualificações/booleanos da fonte.
