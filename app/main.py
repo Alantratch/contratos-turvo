@@ -18,7 +18,8 @@ from sqlalchemy.orm import selectinload
 
 from .core import (
     AuditEvent, Contract, ContractTerm, Procurement, Secretary, SyncRun, SyncState,
-    SessionLocal, init_db, serialize_contract, serialize_procurement
+    SessionLocal, data_source_mode, equiplano_only, init_db, serialize_contract,
+    serialize_procurement,
 )
 
 
@@ -71,6 +72,15 @@ def db():
         yield session
 
 
+def scoped_contracts(stmt):
+    return stmt.where(Contract.pncp_key.like("equiplano:%")) if equiplano_only() else stmt
+
+
+def unavailable_in_equiplano_mode() -> None:
+    if equiplano_only():
+        raise HTTPException(404, "Este módulo não faz parte da versão Equiplano.")
+
+
 @app.get("/healthz")
 def healthz(session: Session = Depends(db)):
     try:
@@ -96,25 +106,35 @@ def assets(name: str):
 @app.get("/api/summary")
 def summary(session: Session = Depends(db)):
     today = date.today()
-    all_contracts = session.scalar(select(func.count()).select_from(Contract)) or 0
-    active = session.scalar(select(func.count()).select_from(Contract).where(Contract.end_date >= today, Contract.start_date <= today)) or 0
-    upcoming = session.scalar(select(func.count()).select_from(Contract).where(Contract.end_date.between(today, today + timedelta(days=30)))) or 0
-    expired = session.scalar(select(func.count()).select_from(Contract).where(Contract.end_date < today)) or 0
-    unclassified = session.scalar(select(func.count()).select_from(Contract).where(Contract.secretary_id.is_(None))) or 0
-    procurements = session.scalar(select(func.count()).select_from(Procurement)) or 0
-    terms = session.scalar(select(func.count()).select_from(ContractTerm).where(ContractTerm.excluded.is_(False))) or 0
+    scope = Contract.pncp_key.like("equiplano:%") if equiplano_only() else True
+    all_contracts = session.scalar(select(func.count()).select_from(Contract).where(scope)) or 0
+    active = session.scalar(select(func.count()).select_from(Contract).where(scope, Contract.end_date >= today, Contract.start_date <= today)) or 0
+    upcoming = session.scalar(select(func.count()).select_from(Contract).where(scope, Contract.end_date.between(today, today + timedelta(days=30)))) or 0
+    expired = session.scalar(select(func.count()).select_from(Contract).where(scope, Contract.end_date < today)) or 0
+    unclassified = session.scalar(select(func.count()).select_from(Contract).where(scope, Contract.secretary_id.is_(None))) or 0
+    procurements = 0 if equiplano_only() else session.scalar(select(func.count()).select_from(Procurement)) or 0
+    term_stmt = select(func.count()).select_from(ContractTerm).where(ContractTerm.excluded.is_(False))
+    if equiplano_only():
+        term_stmt = term_stmt.join(Contract).where(Contract.pncp_key.like("equiplano:%"))
+    terms = session.scalar(term_stmt) or 0
     groups = session.execute(
         select(Secretary.name, func.count(Contract.id))
         .join(Contract, Contract.secretary_id == Secretary.id)
-        .where(Contract.end_date.between(today, today + timedelta(days=60)))
+        .where(scope, Contract.end_date.between(today, today + timedelta(days=60)))
         .group_by(Secretary.name)
         .order_by(func.count(Contract.id).desc())
     ).all()
-    latest = session.scalar(select(SyncRun).order_by(SyncRun.id.desc()).limit(1))
+    latest_stmt = select(SyncRun).order_by(SyncRun.id.desc()).limit(1)
+    if equiplano_only():
+        latest_stmt = latest_stmt.where(SyncRun.kind == "equiplano")
+    latest = session.scalar(latest_stmt)
+    mode = data_source_mode()
     return {
         "all": all_contracts, "active": active, "upcoming": upcoming,
         "expired": expired, "unclassified": unclassified,
         "procurements": procurements, "terms": terms,
+        "source_mode": mode,
+        "source_label": "Equiplano" if equiplano_only() else "PNCP + Compras.gov.br + Equiplano",
         "by_secretary": [{"name": n, "count": count} for n, count in groups],
         "sync": {
             "status": latest.status,
@@ -135,7 +155,7 @@ def contracts(
     session: Session = Depends(db),
 ):
     today = date.today()
-    stmt = select(Contract)
+    stmt = scoped_contracts(select(Contract))
     if q.strip():
         for word in q.split():
             term = "%" + word + "%"
@@ -182,9 +202,9 @@ def calendar(
         raise HTTPException(422, "Mês fora do intervalo permitido")
     first_day = date(year, month_number, 1)
     next_month = date(year + 1, 1, 1) if month_number == 12 else date(year, month_number + 1, 1)
-    stmt = select(Contract).options(joinedload(Contract.secretary), selectinload(Contract.terms)).where(
+    stmt = scoped_contracts(select(Contract).options(joinedload(Contract.secretary), selectinload(Contract.terms)).where(
         Contract.end_date >= first_day, Contract.end_date < next_month
-    )
+    ))
     if secretary_id is not None:
         stmt = stmt.where(Contract.secretary_id == secretary_id)
     grouped = {}
@@ -201,6 +221,7 @@ def procurements(
     limit: int = Query(25, ge=1, le=100),
     session: Session = Depends(db),
 ):
+    unavailable_in_equiplano_mode()
     stmt = select(Procurement)
     if q.strip():
         term = "%" + q.strip() + "%"
@@ -233,6 +254,7 @@ def licitacoes(
     session: Session = Depends(db),
 ):
     """Agenda e catálogo anual pelas datas oficiais do Compras.gov.br."""
+    unavailable_in_equiplano_mode()
     if month:
         month_year, month_number = map(int, month.split("-"))
         if year is not None and year != month_year:
@@ -307,7 +329,7 @@ class Classification(BaseModel):
 @app.post("/api/contracts/{contract_id}/secretary")
 def assign_secretary(contract_id: int, body: Classification, session: Session = Depends(db)):
     contract = session.get(Contract, contract_id)
-    if not contract:
+    if not contract or (equiplano_only() and not contract.pncp_key.startswith("equiplano:")):
         raise HTTPException(404, "Contrato não encontrado")
     if body.secretary_id is not None and not session.get(Secretary, body.secretary_id):
         raise HTTPException(404, "Secretaria não encontrada")
@@ -321,8 +343,11 @@ def assign_secretary(contract_id: int, body: Classification, session: Session = 
 
 @app.get("/api/sync")
 def synchronization(session: Session = Depends(db)):
-    recent = session.scalars(select(SyncRun).order_by(SyncRun.id.desc()).limit(10)).all()
-    cursor = session.get(SyncState, "publication")
+    run_stmt = select(SyncRun).order_by(SyncRun.id.desc()).limit(10)
+    if equiplano_only():
+        run_stmt = run_stmt.where(SyncRun.kind == "equiplano")
+    recent = session.scalars(run_stmt).all()
+    cursor = None if equiplano_only() else session.get(SyncState, "publication")
     return {
         "next_publication_day": cursor.next_day.isoformat() if cursor else None,
         "runs": [{

@@ -1,4 +1,4 @@
-"""Persistência e normalização de dados do PNCP."""
+"""Persistência e normalização dos contratos municipais."""
 from __future__ import annotations
 
 import hashlib
@@ -18,6 +18,18 @@ if not DATABASE_URL:
 TARGET_CNPJ = re.sub(r"\D", "", os.getenv("TARGET_CNPJ", "78279973000107"))
 engine = create_engine(DATABASE_URL, pool_pre_ping=True, future=True)
 SessionLocal = sessionmaker(bind=engine, expire_on_commit=False)
+
+
+def data_source_mode() -> str:
+    return os.getenv("DATA_SOURCE_MODE", "all").strip().lower()
+
+
+def equiplano_only() -> bool:
+    return data_source_mode() == "equiplano"
+
+
+def is_equiplano_key(key: str | None) -> bool:
+    return str(key or "").startswith("equiplano:")
 
 
 def utcnow() -> datetime:
@@ -64,7 +76,7 @@ class Contract(Base):
 
 
 class ContractTerm(Base):
-    """Termo contratual publicado pelo PNCP, incluindo aditivo e apostilamento."""
+    """Termo contratual, incluindo aditivo, apostilamento e rescisão."""
     __tablename__ = "contract_terms"
     id: Mapped[int] = mapped_column(primary_key=True)
     term_key: Mapped[str] = mapped_column(String(150), unique=True, index=True)
@@ -385,12 +397,15 @@ def upsert_procurement(session: Session, payload: dict) -> str:
     return status
 
 
-def auto_classify_contract_units(session: Session) -> int:
+def auto_classify_contract_units(session: Session, only_equiplano: bool = False) -> int:
     """Cria áreas a partir da unidade oficial e não tenta adivinhar gestor ou e-mail."""
     generic_units = {"PREFEITURA MUNICIPAL DE TURVO - PR"}
     areas = {row.name: row for row in session.scalars(select(Secretary)).all()}
     changed = 0
-    contracts = session.scalars(select(Contract).where(Contract.secretary_id.is_(None), Contract.unit != "")).all()
+    stmt = select(Contract).where(Contract.secretary_id.is_(None), Contract.unit != "")
+    if only_equiplano:
+        stmt = stmt.where(Contract.pncp_key.like("equiplano:%"))
+    contracts = session.scalars(stmt).all()
     for contract in contracts:
         name = contract.unit.strip()
         if not name or name in generic_units:
@@ -408,6 +423,8 @@ def auto_classify_contract_units(session: Session) -> int:
 
 def serialize_contract(c: Contract) -> dict:
     terms = [serialize_contract_term(term) for term in c.terms if not term.excluded]
+    raw = c.raw if isinstance(c.raw, dict) else {}
+    equiplano = is_equiplano_key(c.pncp_key)
     return {
         "id": c.id, "pncp_key": c.pncp_key, "number": c.number,
         "year": c.year, "sequence": c.sequence, "buyer_cnpj": c.buyer_cnpj,
@@ -419,6 +436,8 @@ def serialize_contract(c: Contract) -> dict:
         "secretary": c.secretary.name if c.secretary else None,
         "terms_count": len(terms),
         "terms": terms,
+        "source": "Equiplano" if equiplano else "PNCP",
+        "source_url": raw.get("fonteUrl") if equiplano else None,
     }
 
 

@@ -1,5 +1,10 @@
 # Histórico de versões
 
+## [0.13.0] — 2026-11-16
+- Adicionada variante configurável exclusiva do Equiplano com `DATA_SOURCE_MODE=equiplano`.
+- Worker, resumo, contratos, calendário e sincronização filtram apenas chaves `equiplano:ano:id` nesse modo.
+- PNCP/Compras.gov.br e licitações ficam ocultos e bloqueados na API da variante; alertas continuam desligados.
+
 ## [0.12.1] — 2026-11-12
 - Revisão responsiva por módulo para telas de celular.
 - Tabelas de contratos, contratações, licitações e sincronização viram cartões empilhados, sem rolagem horizontal interna.

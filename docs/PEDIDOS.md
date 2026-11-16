@@ -145,3 +145,10 @@ Cada solicitação de alteração deve gerar entrada rastreável, commit(s), tes
 - **Solicitação:** revisar a visualização no celular e corrigir bugs de design em todos os módulos.
 - **Implementado:** menu móvel com fechamento por fundo, tabelas transformadas em cartões legíveis em telas estreitas, filtros e paginação reorganizados, catálogo de licitações sem rolagem horizontal interna e preservação do calendário como grade compacta com painel de detalhes.
 - **Validação:** viewport de 390 px em produção, sem overflow horizontal no documento; módulos de visão geral, contratos, contratações, licitações, calendário, secretarias e sincronização conferidos.
+
+## CT-0014 — Variante exclusiva do Equiplano
+
+- **Pedido:** criar outra versão do site usando somente o Portal de Transparência/Equiplano, sem PNCP, Compras.gov.br ou licitações, porque existem contratos e aditivos que não chegam ao PNCP.
+- **Implementado:** modo `DATA_SOURCE_MODE=equiplano`, filtro de contratos/aditivos por chave Equiplano, worker sem rotinas PNCP/Compras.gov.br, API sem exposição dos módulos incompatíveis e interface adaptada para identificar a fonte única.
+- **Preservação:** o modo padrão `all` mantém a versão integrada atual; nenhum dado é apagado e os alertas continuam desligados.
+- **Operação:** a variante deve usar recurso e volume PostgreSQL separados quando publicada como outro site.

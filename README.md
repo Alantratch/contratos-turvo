@@ -2,6 +2,8 @@
 
 Painel interno da Prefeitura de Turvo/PR para monitoramento de contratos publicados no PNCP, contratos do Portal de Transparência/Equiplano e contratações publicadas no Compras.gov.br, com histórico importado, atualização incremental, classificação por secretaria e alertas de vigência.
 
+É possível publicar uma variante exclusiva do Equiplano definindo `DATA_SOURCE_MODE=equiplano`. Nessa variante, o worker consulta somente o Portal de Transparência/Equiplano, a interface oculta PNCP/Compras.gov.br e contratos/aditivos são filtrados pela chave `equiplano:ano:id`.
+
 **Estado:** MVP funcional sujeito a homologação de dados, destinatários, autenticação e deploy. O sistema não substitui a validação de contratos/aditivos pela área responsável.
 
 ## Meta e versionamento
@@ -21,6 +23,8 @@ O painel inclui **calendário de vencimentos** por mês e secretaria, mostrando 
 7. Configure backup recorrente do volume PostgreSQL, cópia externa e teste restauração.
 
 Variáveis geradas automaticamente pelo Coolify: `SERVICE_PASSWORD_64_DB`, `SERVICE_USER_ADMIN`, `SERVICE_PASSWORD_64_ADMIN`. O arquivo `.env.example` documenta o uso fora do Coolify. Não comite `.env`.
+
+Para a variante Equiplano, crie um recurso/volume PostgreSQL separado e configure `DATA_SOURCE_MODE=equiplano`, `EQUIPLANO_ENABLED=true`, `EQUIPLANO_START_YEAR=2021` e `ALERTS_ENABLED=false`. Não reutilize o volume da versão integrada se a separação de dados precisar ser física.
 
 ### Desenvolvimento
 ```bash

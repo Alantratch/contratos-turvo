@@ -241,6 +241,37 @@ def test_api_requires_auth_and_serves_dashboard():
         assert client.get("/assets/vendor/bootstrap.min.css", auth=auth).status_code == 200
 
 
+def test_equiplano_only_mode_filters_contracts_and_disables_other_modules(monkeypatch):
+    from fastapi.testclient import TestClient
+    from app.main import app
+
+    pncp = sample()
+    pncp["numeroControlePNCP"] = "78279973000107-2-02001/2026"
+    pncp["nomeRazaoSocialFornecedor"] = "ONLY MODE PNCP"
+    equiplano = sample()
+    equiplano["numeroControlePNCP"] = "equiplano:2026:02002"
+    equiplano["nomeRazaoSocialFornecedor"] = "ONLY MODE EQUIPLANO"
+    equiplano["fonteUrl"] = "https://turvopr.equiplano.com.br:7069/transparencia/contratos"
+    with SessionLocal() as db:
+        upsert_contract(db, pncp)
+        upsert_contract(db, equiplano)
+        db.commit()
+
+    monkeypatch.setenv("DATA_SOURCE_MODE", "equiplano")
+    with TestClient(app) as client:
+        auth = ("test", "test-password")
+        contracts = client.get("/api/contracts?q=ONLY+MODE", auth=auth)
+        summary = client.get("/api/summary", auth=auth)
+        assert contracts.status_code == 200
+        assert [item["supplier"] for item in contracts.json()["items"]] == ["ONLY MODE EQUIPLANO"]
+        assert contracts.json()["items"][0]["source"] == "Equiplano"
+        assert contracts.json()["items"][0]["source_url"].startswith("https://turvopr")
+        assert summary.status_code == 200
+        assert summary.json()["source_mode"] == "equiplano"
+        assert client.get("/api/procurements", auth=auth).status_code == 404
+        assert client.get("/api/licitacoes?year=2026", auth=auth).status_code == 404
+
+
 def test_contract_search_matches_all_supplier_words():
     from fastapi.testclient import TestClient
     payload = sample()

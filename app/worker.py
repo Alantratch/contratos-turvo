@@ -17,8 +17,8 @@ from sqlalchemy.orm import Session, joinedload
 
 from .core import (
     AlertDelivery, Contract, SyncRun, SyncState,
-    SessionLocal, TARGET_CNPJ, auto_classify_contract_units, init_db, upsert_contract,
-    upsert_contract_term, upsert_procurement, utcnow,
+    SessionLocal, TARGET_CNPJ, auto_classify_contract_units, equiplano_only, init_db,
+    upsert_contract, upsert_contract_term, upsert_procurement, utcnow,
 )
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
@@ -390,7 +390,7 @@ def sync_equiplano():
                         result = upsert_contract_term(session, parent, term)
                         processed += int(result in ("inserted", "updated"))
                     session.commit()
-            auto_classify_contract_units(session)
+            auto_classify_contract_units(session, only_equiplano=equiplano_only())
             run.processed = processed
             run.status = "ok"
             run.finished_at = utcnow()
@@ -407,7 +407,7 @@ def sync_equiplano():
 
 def classify_existing_contracts():
     with SessionLocal() as session:
-        changed = auto_classify_contract_units(session)
+        changed = auto_classify_contract_units(session, only_equiplano=equiplano_only())
         session.commit()
         if changed:
             LOG.info("classificação automática por unidade: %d contratos", changed)
@@ -507,10 +507,12 @@ def alerts():
         return
     today = date.today()
     with SessionLocal() as session:
-        candidates = session.scalars(
-            select(Contract).options(joinedload(Contract.secretary))
-            .where(Contract.end_date.between(today, today + timedelta(days=120)))
-        ).all()
+        stmt = select(Contract).options(joinedload(Contract.secretary)).where(
+            Contract.end_date.between(today, today + timedelta(days=120))
+        )
+        if equiplano_only():
+            stmt = stmt.where(Contract.pncp_key.like("equiplano:%"))
+        candidates = session.scalars(stmt).all()
         for contract in candidates:
             if not contract.secretary or not contract.secretary.email:
                 continue
@@ -528,13 +530,14 @@ def alerts():
             if exists:
                 continue
             try:
+                source_name = "Equiplano" if equiplano_only() else "PNCP"
                 send_email(
                     recipient,
                     "Atenção: contrato %s vence em %s dias" % (contract.number, days),
                     ("Prefeitura de Turvo/PR\nContrato: %s\nSecretaria: %s\nFornecedor: %s\n"
-                     "Vigência cadastrada no PNCP até: %s\nFaltam: %s dias\n\n"
+                     "Vigência cadastrada no %s até: %s\nFaltam: %s dias\n\n"
                      "Verificar aditivos, situação jurídica e providências com o setor de contratos.")
-                    % (contract.number, contract.secretary.name, contract.supplier, contract.end_date.isoformat(), days),
+                    % (contract.number, contract.secretary.name, contract.supplier, source_name, contract.end_date.isoformat(), days),
                 )
                 session.add(AlertDelivery(contract_id=contract.id, threshold_days=threshold,
                                           due_date=contract.end_date, recipient=recipient))
@@ -548,12 +551,15 @@ def main():
     init_db()
     while True:
         try:
-            sync_publication()
-            sync_updates()
-            classify_existing_contracts()
-            sync_terms()
-            sync_equiplano()
-            sync_procurements()
+            if equiplano_only():
+                sync_equiplano()
+            else:
+                sync_publication()
+                sync_updates()
+                classify_existing_contracts()
+                sync_terms()
+                sync_equiplano()
+                sync_procurements()
             alerts()
         except Exception:
             LOG.exception("Falha no ciclo do coletor")

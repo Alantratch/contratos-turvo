@@ -14,6 +14,7 @@
 - Dashboard: primeiro acesso deve pedir login HTTP Basic (credenciais do Coolify).
 - Sincronização: painel mostra `next_publication_day`; evolui por janelas de 30 dias a cada ciclo. Erros não devem mover o cursor.
 - Equiplano: confira uma execução `equiplano` no painel. `EQUIPLANO_START_YEAR=2021` faz o backfill dos contratos e aditivos desde 2021; `EQUIPLANO_VERIFY_TLS=false` é uma exceção temporária porque o portal público entrega cadeia TLS incompleta.
+- Variante exclusiva: use `DATA_SOURCE_MODE=equiplano` em um recurso/volume separado. O worker não executa as rotinas PNCP/Compras.gov.br e a API/UI não expõem os módulos dessas fontes.
 - Conferir amostra de pelo menos 10 contratos no PNCP, inclusive datas de vigência, aditivos e órgão.
 - Validar quem são os fiscais e os endereços da secretaria antes de ativar alertas.
 

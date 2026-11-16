@@ -22,6 +22,7 @@
   let licitacaoCatalog = [];
   let licitacaoSearch = "";
   let licitacaoRequest = 0;
+  let sourceMode = "all";
 
   const html = (text) => String(text ?? "").replace(/[&<>"']/g, (c) => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
   const date = (s) => s ? new Intl.DateTimeFormat("pt-BR", {timeZone:"UTC"}).format(new Date(s + "T12:00:00Z")) : "Não informada";
@@ -55,6 +56,36 @@
     window.setTimeout(() => { node.hidden = true; }, 6000);
   }
 
+  function configureSource(mode) {
+    sourceMode = mode === "equiplano" ? "equiplano" : "all";
+    const onlyEquiplano = sourceMode === "equiplano";
+    document.title = onlyEquiplano ? "Contratos Equiplano · Turvo/PR" : "Contratos · Turvo/PR";
+    $("brand-caption").textContent = onlyEquiplano ? "Gestão de contratos · Equiplano" : "Gestão de contratos";
+    $("source-chip-label").textContent = onlyEquiplano ? "Equiplano · Portal Municipal" : "PNCP · Compras.gov.br · Equiplano";
+    $("source-description").textContent = onlyEquiplano ? "Contratos e aditivos importados do Equiplano." : "Dados públicos importados para acompanhamento interno.";
+    $("footer-source-label").textContent = onlyEquiplano ? "Equiplano · Portal Municipal" : "PNCP + Compras.gov.br + Equiplano";
+    $("stat-all-label").textContent = onlyEquiplano ? "Acervo Equiplano" : "Acervo integrado";
+    $("routine-source").textContent = onlyEquiplano ? "Contratos e aditivos entram diretamente do Equiplano." : "Dados públicos entram pelas fontes integradas.";
+    $("secretary-source-description").textContent = onlyEquiplano ? "Áreas cadastradas para os contratos do Equiplano" : "Vínculos automáticos a partir das fontes integradas";
+    $("sync-history-subtitle").textContent = onlyEquiplano ? "O histórico avança por ano no Equiplano." : "O histórico avança após cada janela concluída.";
+    $("sync-history-description").textContent = onlyEquiplano ? "Contratos e aditivos são atualizados pelo worker sem bloquear o painel." : "Os dados são atualizados pelo worker sem bloquear o painel.";
+    $("sync-date-label").textContent = onlyEquiplano ? "FONTE ÚNICA" : "PRÓXIMA DATA";
+    ["procurements", "licitacoes"].forEach((name) => {
+      const nav = document.querySelector(`[data-view="${name}"]`);
+      if (nav) nav.hidden = onlyEquiplano;
+      const section = $(name);
+      if (section && onlyEquiplano) section.hidden = true;
+    });
+  }
+
+  function sourceLink(contract) {
+    if (contract.source === "Equiplano" && contract.source_url) {
+      return '<a target="_blank" rel="noopener noreferrer" href="' + html(contract.source_url) + '">Abrir Equiplano ↗</a>';
+    }
+    const eligibleLink = /^\d{14}$/.test(contract.buyer_cnpj || "") && Number.isInteger(contract.year) && Number.isInteger(contract.sequence);
+    return eligibleLink ? '<a target="_blank" rel="noopener noreferrer" href="https://pncp.gov.br/app/contratos/' + contract.buyer_cnpj + '/' + contract.year + '/' + contract.sequence + '">Abrir PNCP ↗</a>' : "Referência indisponível";
+  }
+
   function switchView(next) {
     view = next;
     document.querySelectorAll(".view").forEach((section) => { section.hidden = section.id !== next; });
@@ -79,11 +110,15 @@
   async function loadSummary() {
     try {
       const s = await api("/api/summary");
+      configureSource(s.source_mode);
       $("stat-all").textContent = number(s.all);
       $("stat-active").textContent = number(s.active);
       $("stat-upcoming").textContent = number(s.upcoming);
       $("stat-unclassified").textContent = number(s.unclassified);
-      $("overview-sync").textContent = s.sync ? "Última verificação: " + (s.sync.status === "ok" ? "concluída" : "com falha") + (s.sync.finished_at ? " · " + new Date(s.sync.finished_at).toLocaleString("pt-BR") : "") : "Aguardando primeira sincronização";
+      const syncLabels = {ok: "Dados atualizados", running: "Atualizando dados", error: "Falha na atualização"};
+      const syncLabel = s.sync ? (syncLabels[s.sync.status] || "Estado desconhecido") : "Aguardando primeira sincronização";
+      $("sync-status-label").textContent = syncLabel;
+      $("overview-sync").textContent = s.sync ? syncLabel + (s.sync.finished_at ? " · " + new Date(s.sync.finished_at).toLocaleString("pt-BR") : "") : "Aguardando primeira sincronização";
       const groups = s.by_secretary || [];
       $("secretary-chart").className = groups.length ? "chart-bars" : "chart-empty";
       $("secretary-chart").innerHTML = groups.length ? groups.slice(0, 7).map((g) => {
@@ -137,8 +172,7 @@
       $("prev").disabled = page <= 1;
       $("next").disabled = page * 25 >= pageTotal;
       $("contracts-body").innerHTML = result.items.length ? result.items.map((c) => {
-        const eligibleLink = /^\d{14}$/.test(c.buyer_cnpj || "") && Number.isInteger(c.year) && Number.isInteger(c.sequence);
-        const link = eligibleLink ? '<a target="_blank" rel="noopener noreferrer" href="https://pncp.gov.br/app/contratos/' + c.buyer_cnpj + '/' + c.year + '/' + c.sequence + '">Abrir PNCP ↗</a>' : "Referência indisponível";
+        const link = sourceLink(c);
         const termDetails = (c.terms || []).map(term =>
           '<span class="term-row"><b>' + html(term.type_name || "Termo") + ' ' + html(term.number || ("#" + term.sequence)) + ':</b> ' +
           html((term.object || "Objeto do termo não informado").slice(0, 110)) + '</span>'
@@ -322,7 +356,7 @@
   async function loadSync() {
     try {
       const data = await api("/api/sync");
-      $("cursor-date").textContent = data.next_publication_day ? date(data.next_publication_day) : "Aguardando início";
+      $("cursor-date").textContent = sourceMode === "equiplano" ? "Equiplano" : (data.next_publication_day ? date(data.next_publication_day) : "Aguardando início");
       $("sync-body").innerHTML = data.runs.length ? data.runs.map((r) =>
         '<tr><td><strong>' + html(r.kind) + '</strong></td><td>' + new Date(r.started_at).toLocaleString("pt-BR") +
         '</td><td>' + number(r.processed) + '</td><td><span class="status ' + (r.status === "ok" ? "good" : r.status === "error" ? "danger" : "neutral") + '">' +
@@ -442,8 +476,7 @@
     if (requestId !== calendarRequest || day !== calendarSelectedDay || view !== "calendar") return;
     $("calendar-selected-count").textContent = number(items.length) + " contrato(s) com vencimento registrado nesta data";
     $("calendar-day-list").innerHTML = items.length ? items.map(c => {
-      const hasPncpLink = /^\d{14}$/.test(c.buyer_cnpj || "") && Number.isInteger(c.year) && Number.isInteger(c.sequence);
-      const pncpLink = hasPncpLink ? '<a class="entry-link" target="_blank" rel="noopener noreferrer" href="https://pncp.gov.br/app/contratos/' + c.buyer_cnpj + '/' + c.year + '/' + c.sequence + '">Abrir no PNCP ↗</a>' : "";
+      const sourceEntryLink = c.source === "Equiplano" && c.source_url ? '<a class="entry-link" target="_blank" rel="noopener noreferrer" href="' + html(c.source_url) + '">Abrir no Equiplano ↗</a>' : (/^\d{14}$/.test(c.buyer_cnpj || "") && Number.isInteger(c.year) && Number.isInteger(c.sequence) ? '<a class="entry-link" target="_blank" rel="noopener noreferrer" href="https://pncp.gov.br/app/contratos/' + c.buyer_cnpj + '/' + c.year + '/' + c.sequence + '">Abrir no PNCP ↗</a>' : "");
       const termDetails = (c.terms || []).map(term =>
         '<div class="term-detail"><div class="term-heading"><strong>' + html(term.type_name || "Termo contratual") + ' ' + html(term.number || ("#" + term.sequence)) + '</strong><span>' + date(term.end_date) + '</span></div><p>' +
         html(term.object || "Objeto do termo não informado") + '</p><small>Publicado em ' + date(term.published_at) + (term.amount_added ? ' · Acréscimo: ' + money(term.amount_added) : '') + '</small></div>'
@@ -453,7 +486,7 @@
         '</div><p class="calendar-entry-object">' + html(c.object || "Objeto não informado") + '</p><small>' +
         html(c.supplier || "Fornecedor não informado") + '</small><small>' +
         html(c.secretary || "Sem secretaria definida") + '</small><small class="calendar-entry-object">' +
-        html(money(c.amount)) + '</small>' + termsMarkup + pncpLink + '</article>';
+        html(money(c.amount)) + '</small>' + termsMarkup + sourceEntryLink + '</article>';
     }).join("") : '<p class="muted calendar-empty">Nenhum contrato com vencimento registrado nesse dia.</p>';
     $("calendar-see-all").hidden = items.length === 0;
   }
